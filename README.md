@@ -1,4 +1,9 @@
-## Zodiac Buddy
+# [![](https://raw.githubusercontent.com/FFXIV-CombatReborn/RebornAssets/main/IconAssets/ZBR_Icon.png)](https://github.com/FFXIV-CombatReborn/ZodiacBuddyReborn)
+
+ **Zodiac Buddy Reborn**
+ 
+![Github Latest Releases](https://img.shields.io/github/downloads/FFXIV-CombatReborn/ZodiacBuddyReborn/latest/total.svg?style=for-the-badge)
+![Github License](https://img.shields.io/github/license/FFXIV-CombatReborn/ZodiacBuddyReborn.svg?label=License&style=for-the-badge)
 [![](https://dcbadge.limes.pink/api/server/p54TZMPnC9)](https://discord.gg/p54TZMPnC9)
 
 This plugin makes the ARR relic experience slightly easier.
