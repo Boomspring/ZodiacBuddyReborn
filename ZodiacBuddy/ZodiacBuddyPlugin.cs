@@ -19,13 +19,13 @@ public sealed class ZodiacBuddyPlugin : IDalamudPlugin {
     private const string Command = "/pzodiac";
     private const string TargetWindowCommand = "/ztarget";
 
+    private readonly AtmaManager atmaManager;
     private readonly NovusManager novusManager;
     private readonly BraveManager braveManager;
     private readonly WindowSystem windowSystem;
     internal TargetInfoWindow TargetWindow;
-
     private readonly ConfigWindow configWindow;
-    private readonly AtmaManager atma;
+    
     /// <summary>
     /// Initializes a new instance of the <see cref="ZodiacBuddyPlugin"/> class.
     /// </summary>
@@ -58,21 +58,19 @@ public sealed class ZodiacBuddyPlugin : IDalamudPlugin {
         Service.BonusLightManager = new BonusLightManager();
         this.novusManager = new NovusManager();
         this.braveManager = new BraveManager();
-        this.atma = new AtmaManager();
-        AtmaManager.OnFallbackPathIssued = () => atma.EnqueueUnmountAfterNav();
+        this.atmaManager = new AtmaManager();
         AutoDutyIpc.Init();
     }
 
     /// <inheritdoc/>
     public void Dispose() {
-        Svc.Framework.Update -= atma.WaitForBetweenAreasAndExecute;
-        atma.Dispose();
         Service.CommandManager.RemoveHandler(Command);
         windowSystem.RemoveWindow(TargetWindow);
         Service.CommandManager.RemoveHandler(TargetWindowCommand);
         Service.Interface.UiBuilder.Draw -= this.windowSystem.Draw;
         Service.Interface.UiBuilder.OpenConfigUi -= this.OnOpenConfigUi;
 
+        this.atmaManager.Dispose();
         this.novusManager.Dispose();
         this.braveManager.Dispose();
         Service.BonusLightManager.Dispose();
@@ -82,6 +80,7 @@ public sealed class ZodiacBuddyPlugin : IDalamudPlugin {
     {
         TargetWindow.IsOpen = true;
     }
+
     /// <summary>
     /// Print a message.
     /// </summary>

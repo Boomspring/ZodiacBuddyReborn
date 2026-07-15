@@ -81,52 +81,30 @@ internal struct BraveBook {
 
                 for (var i = 0; i < enemyCount; i++) {
                     var mntc = bookRow.MonsterNoteTargetCommon[i].Value;
-                    // var mntcID = mntc.RowId;
-
-                    var zoneRow = mntc.PlaceNameZone[0].Value;
-                    var zoneName = zoneRow.Name.ExtractText();
-                    var zoneId = zoneRow.RowId;
-
-                    var locationName = mntc.PlaceNameLocation[0].Value.Name.ExtractText();
-
-                    var name = mntc.BNpcName.Value.Singular.ExtractText();
-
                     var position = GetMonsterPosition(mntc.RowId);
 
                     // Service.PluginLog.Debug($"Loaded enemy {mntcID}: {name}");
                     braveBook.Enemies[i] = new BraveTarget {
-                        Name = name,
-                        ZoneName = zoneName,
-                        ZoneId = zoneId,
-                        LocationName = locationName,
+                        Name = mntc.BNpcName.Value.Singular.ExtractText(),
+                        ZoneName = mntc.PlaceNameZone[0].Value.Name.ExtractText(),
+                        ZoneId = position.TerritoryType.RowId,
+                        LocationName = mntc.PlaceNameLocation[0].Value.Name.ExtractText(),
                         Position = position,
                     };
                 }
 
                 for (var i = 0; i < dungeonCount; i++) {
                     var mntc = bookRow.MonsterNoteTargetNM[i].Value;
-                    // var mntcID = mntc.RowId;
-
-                    var zoneRow = mntc.PlaceNameZone[0].Value;
-                    var zoneName = zoneRow.Name.ExtractText();
-                    var zoneId = zoneRow.RowId;
-
-                    var locationName = mntc.PlaceNameLocation[0].Value.Name.ExtractText();
-
-                    var name = mntc.BNpcName.Value.Singular;
-
                     var position = GetMonsterPosition(mntc.RowId);
-
-                    var cfcId = position.TerritoryType.Value.ContentFinderCondition.Value.RowId;
-
+                    
                     // Service.PluginLog.Debug($"Loaded dungeon {mntcID}: {name}");
                     braveBook.Dungeons[i] = new BraveTarget {
-                        Name = name.ExtractText(),
-                        ZoneName = zoneName,
-                        ZoneId = zoneId,
-                        LocationName = locationName,
+                        Name = mntc.BNpcName.Value.Singular.ExtractText(),
+                        ZoneName = mntc.PlaceNameZone[0].Value.Name.ExtractText(),
+                        ZoneId = position.TerritoryType.RowId,
+                        LocationName = mntc.PlaceNameLocation[0].Value.Name.ExtractText(),
                         Position = position,
-                        ContentsFinderConditionId = cfcId,
+                        ContentsFinderConditionId = position.TerritoryType.Value.ContentFinderCondition.Value.RowId,
                     };
                 }
 
@@ -182,7 +160,7 @@ internal struct BraveBook {
         }
     }
 
-    private static MapLinkPayload GetMonsterPosition(uint monsterTargetId) {
+    public static MapLinkPayload GetMonsterPosition(uint monsterTargetId) {
         return monsterTargetId switch {
             356 => new MapLinkPayload( 152,   5, 28.2f, 12.9f), // sylpheed screech        // East Shroud
             357 => new MapLinkPayload( 156,  25, 17.0f, 16.0f), // daring harrier          // Mor Dhona

@@ -1,40 +1,42 @@
 using Dalamud.Game.ClientState.Conditions;
 using Dalamud.Game.ClientState.Objects.Enums;
 using Dalamud.Game.ClientState.Objects.Types;
+using Dalamud.Game.Inventory;
 using Dalamud.Interface.Windowing;
 using Dalamud.Plugin.Services;
-using ECommons.Automation.LegacyTaskManager;
 using ECommons.DalamudServices;
 using FFXIVClientStructs.FFXIV.Common.Math;
 using Dalamud.Bindings.ImGui;
 using System;
-using System.Collections.Generic;
+using System.Linq;
+using Dalamud.Utility;
 using ZodiacBuddy.Stages.Atma;
 using ECommons.GameHelpers;
+using FFXIVClientStructs.FFXIV.Client.Game;
+using FFXIVClientStructs.FFXIV.Client.System.Framework;
+using FFXIVClientStructs.FFXIV.Client.UI;
 using ZodiacBuddy.SmartCaseUtil;
+using ZodiacBuddy.Stages.Atma.Data;
+using TaskManager = ECommons.Automation.LegacyTaskManager.TaskManager;
+using Lumina.Excel.Sheets;
 
 namespace ZodiacBuddy
 {
     internal class TargetInfoWindow : Window
     {
-        private readonly TaskManager TaskManager = new();
         public string? CurrentTarget;
-        public ulong CurrentTargetId;
-        public bool IsPathing => VNavmesh.Path.IsRunning();
-        private bool pendingPathing = false;
-        private DateTime lastPathingTime = DateTime.MinValue;
-        private bool CompletedObjective => TargetingHelper.KillCount >= 3;
-        private bool rsrEnabled = false;
-        private readonly HashSet<ulong> RegisteredKills = [];
-        private bool fallbackSuppressedPermanently = false;
+        public string? KillCount;
+        public bool CompletedObjective => this.KillCount?.StartsWith('3') ?? false;
         public Vector3? CurrentTargetPosition { get; private set; }
-        private DateTime fallbackSuppressionUntil = DateTime.MinValue;
+        public GameInventoryItem? RelicBookGameItem;
 
         public TargetInfoWindow() : base("ZodiacBuddy Target Info", ImGuiWindowFlags.AlwaysAutoResize)
         {
             this.IsOpen = Service.Configuration.TargetInfoWindowWasOpen;
-
-            Svc.Framework.Update += OnFrameworkUpdate;
+            SizeConstraints = new WindowSizeConstraints
+            {
+                MinimumSize = new Vector2(225, 75),
+            };
         }
         public override void OnOpen()
         {
@@ -50,408 +52,114 @@ namespace ZodiacBuddy
         {
             Service.Configuration.TargetInfoWindowWasOpen = Service.Plugin.TargetWindow?.IsOpen ?? false;
             Service.Configuration.Save();
-            Svc.Framework.Update -= OnFrameworkUpdate;
-        }
-        public enum TargetingState
-        {
-            Idle,
-            AwaitingAtmaPathing,
-            Active
-        }
-        public TargetingState State = TargetingState.Idle;
-        private void OnFrameworkUpdate(IFramework framework)
-        {
-            if (!IPCSubscriber.IsReady("vnavmesh"))
-            {
-                return;
-            }
-            if (State != TargetingState.Active)
-                return;
-            if (!Svc.ClientState.IsLoggedIn || Svc.Condition[ConditionFlag.BetweenAreas]) return;
-
-            if (CompletedObjective)
-            {
-                fallbackSuppressedPermanently = true; // Hard FallBack block
-                pendingPathing = false;
-
-                if (State != TargetingState.AwaitingAtmaPathing)
-                {
-                    Service.PluginLog.Debug("Reached 3 kills. Locking logic and clearing target.");
-                    State = TargetingState.AwaitingAtmaPathing;
-
-                    CurrentTargetId = 0;
-                    CurrentTargetPosition = null;
-                    TargetingHelper.StoredTargetId = 0;
-                    TargetingHelper.ResetAutoTargetFlag();
-
-                    if (rsrEnabled)
-                    {
-                        Service.PluginLog.Debug("Kill complete — disabling RSR via /rotation off.");
-                        Service.CommandManager.ProcessCommand("/rotation off");
-                        rsrEnabled = false;
-                    }
-                }
-
-                // Handle post-kill combat case
-                if (Svc.Condition[ConditionFlag.InCombat])
-                {
-                    TargetingHelper.PromoteAggroingEnemy();
-                    pendingPathing = false;
-
-                    if (!rsrEnabled)
-                    {
-                        TaskManager.Enqueue(() =>
-                        {
-                            Service.CommandManager.ProcessCommand("/rotation manual");
-                            rsrEnabled = true;
-                            return true;
-                        });
-                    }
-                }
-                else if (rsrEnabled)
-                {
-                    Service.CommandManager.ProcessCommand("/rotation off");
-                    rsrEnabled = false;
-                    pendingPathing = false;
-                }
-            }
-            if (pendingPathing && !VNavmesh.Path.IsRunning() && (DateTime.Now - lastPathingTime).TotalSeconds > 2)
-            {
-                StartPathingToCurrentTarget();
-            }
-            UpdateCurrentTargetInfo();
-            if (!CompletedObjective)
-            {
-                TargetingHelper.AutoTargetStoredIdIfVisible();
-            }
         }
         
         public void SetTarget(string name, ulong id = 0)
         {
-            RegisteredKills.Clear();
-            fallbackSuppressedPermanently = false;
-            if (State == TargetingState.Active)
-                return;
-
             CurrentTarget = SmartCaseHelper.SmartTitleCase(name);
-            CurrentTargetId = id;
             CurrentTargetPosition = null;
-
-            if (!string.IsNullOrWhiteSpace(name))
-                TargetingHelper.StartKillTracking(name);
-
-            if (id != 0)
-            {
-                TargetingHelper.StoredTargetId = id;
-                TargetingHelper.ResetAutoTargetFlag();
-            }
-
-            State = TargetingState.AwaitingAtmaPathing;
         }
-
-        // This is called by AtmaManager once /vnav moveflag finishes
-        public void OnAtmaPathingComplete()
-        {
-            fallbackSuppressedPermanently = false;
-            Service.PluginLog.Debug("Atma Pathing complete, unlocking targeting logic.");
-            State = TargetingState.Active;
-            pendingPathing = true;
-            fallbackSuppressionUntil = DateTime.Now.AddSeconds(0.5);
-            if (!rsrEnabled)
-            {
-                Service.PluginLog.Debug("Enabling RSR via /rotation manual.");
-                TaskManager.Enqueue(new Func<bool?>(() =>
-                {
-                    Service.CommandManager.ProcessCommand("/rotation manual");
-                    rsrEnabled = true;
-                    return true;
-                }));
-            }
-        }
-
-        private void StartPathingToCurrentTarget()
-        {
-            if (VNavmesh.Path.IsRunning())
-            {
-                pendingPathing = true;
-                return;
-            }
-            if (CurrentTargetPosition != null)
-            {
-                var pos = CurrentTargetPosition.Value;
-                if (!IPCSubscriber.IsReady("vnavmesh"))
-                {
-                    pendingPathing = true;
-                    return;
-                }
-                if (!VNavmesh.Nav.IsReady())
-                {
-                    pendingPathing = true;
-                    return;
-                }
-                if (Svc.Condition[ConditionFlag.BetweenAreas])
-                {
-                    pendingPathing = true;
-                    return;
-                }
-                VNavmesh.SimpleMove.PathfindAndMoveTo(pos, false);
-
-                Service.ChatGui.Print($"Pathing to {CurrentTarget} at ({pos.X:F1}, {pos.Y:F1}, {pos.Z:F1})");
-                lastPathingTime = DateTime.Now;
-                pendingPathing = false;
-            }
-            else
-            {
-                if (fallbackSuppressedPermanently || TargetingHelper.KillCount >= 3 || Svc.Condition[ConditionFlag.InCombat])
-                {
-                    pendingPathing = false;
-                    return;
-                }
-                string fallbackCommand = "/vnav moveflag";
-                Service.PluginLog.Debug($"Issuing fallback pathing: {fallbackCommand}");
-                Service.CommandManager.ProcessCommand(fallbackCommand);
-                Service.ChatGui.Print("No enemy found nearby. Pathing to map flag.");
-                AtmaManager.OnFallbackPathIssued?.Invoke();
-                lastPathingTime = DateTime.Now;
-                pendingPathing = false;
-            }
-        }
-
-        public void UpdateCurrentTargetInfo()
-        {
-            if (!string.IsNullOrEmpty(CurrentTarget))
-            {
-                var previousId = CurrentTargetId;
-
-                var playerPosition = Player.Object?.Position ?? Vector3.Zero;
-                ICharacter? match = null;
-                var bestDistance = float.MaxValue;
-
-                foreach (var obj in Svc.Objects)
-                {
-                    if (obj.ObjectKind != ObjectKind.BattleNpc)
-                        continue;
-                    if (obj is not ICharacter c)
-                        continue;
-                    if (c.CurrentHp <= 0)
-                        continue;
-                    if (!obj.Name.TextValue.Equals(CurrentTarget, StringComparison.OrdinalIgnoreCase))
-                        continue;
-
-                    var distance = Vector3.Distance(c.Position, playerPosition);
-                    if (distance < bestDistance)
-                    {
-                        bestDistance = distance;
-                        match = c;
-                    }
-                }
-
-                if (match != null)
-                {
-                    // Only switch if current ID is 0 or the current target is no longer valid
-                    if (CurrentTargetId == 0)
-                    {
-                        CurrentTargetId = match.GameObjectId;
-                        TargetingHelper.StoredTargetId = match.GameObjectId;
-                        TargetingHelper.ResetAutoTargetFlag();
-                        Service.PluginLog.Debug($"Set new target ID: {CurrentTargetId}");
-                    }
-                    else if (match.GameObjectId != CurrentTargetId)
-                    {
-                        ICharacter? previousTarget = null;
-                        foreach (var obj in Svc.Objects)
-                        {
-                            if (obj is ICharacter character &&
-                                character.ObjectKind == ObjectKind.BattleNpc &&
-                                character.GameObjectId == CurrentTargetId)
-                            {
-                                previousTarget = character;
-                                break;
-                            }
-                        }
-
-                        if (previousTarget == null || previousTarget.CurrentHp == 0)
-                        {
-                            Service.PluginLog.Debug($"Previous target {CurrentTargetId} gone or dead. Checking for duplicate registration.");
-
-                            if (CurrentTargetId != 0 && !RegisteredKills.Contains(CurrentTargetId))
-                            {
-                                RegisteredKills.Add(CurrentTargetId);
-                                TargetingHelper.RegisterKillIfMatches(CurrentTargetId, CurrentTarget ?? "");
-                            }
-                            else
-                            {
-                                Service.PluginLog.Debug($"Skipping duplicate or zero-ID kill registration for {CurrentTargetId}.");
-                            }
-                            CurrentTargetId = 0;
-                            CurrentTargetPosition = null;
-                            TargetingHelper.StoredTargetId = 0;
-                            TargetingHelper.ResetAutoTargetFlag();
-                        }
-                        else
-                        {
-                            Service.PluginLog.Debug($"Previous target {CurrentTargetId} still alive. Not registering kill.");
-                        }
-                        Service.PluginLog.Debug($"Switching target from {previousId} to {match.GameObjectId}.");
-                        CurrentTargetId = match.GameObjectId;
-                        TargetingHelper.StoredTargetId = match.GameObjectId;
-                        TargetingHelper.ResetAutoTargetFlag();
-                    }
-                    bool shouldForcePathing = CurrentTargetPosition == null;
-                    if (shouldForcePathing || Vector3.Distance(CurrentTargetPosition!.Value, match.Position) > 2f)
-                    {
-                        CurrentTargetPosition = match.Position;
-                        StartPathingToCurrentTarget();
-                    }
-                    TargetingHelper.AutoTargetStoredIdIfVisible();
-                }
-                else
-                {
-                    if (CurrentTargetId != 0 || CurrentTargetPosition != null)
-                    {
-                        Service.PluginLog.Debug($"Lost sight of {CurrentTarget}, checking for kill...");
-
-                        if (CurrentTargetId != 0 && !RegisteredKills.Contains(CurrentTargetId))
-                        {
-                            RegisteredKills.Add(CurrentTargetId);
-                            TargetingHelper.RegisterKillIfMatches(CurrentTargetId, CurrentTarget ?? "");
-                        }
-                        else
-                        {
-                            Service.PluginLog.Debug($"Skipping duplicate or zero-ID kill registration for {CurrentTargetId}.");
-                        }
-
-                        CurrentTargetId = 0;
-                        CurrentTargetPosition = null;
-                        TargetingHelper.StoredTargetId = 0;
-                        TargetingHelper.ResetAutoTargetFlag();
-
-                        if (!CompletedObjective)
-                            pendingPathing = true;
-                    }
-                }
-                return;
-            }
-
-            var target = Svc.Targets.Target;
-            if (target != null && target.ObjectKind == ObjectKind.BattleNpc)
-            {
-                CurrentTarget = SmartCaseHelper.SmartTitleCase(target.Name.TextValue.Trim());
-                CurrentTargetId = target.GameObjectId;
-                CurrentTargetPosition = target.Position;
-            }
-        }
-
 
         public override void Draw()
         {
-            bool atmaEnabled = Service.Configuration.IsAtmaManagerEnabled;
+            if (!Svc.ClientState.IsLoggedIn || Svc.Condition[ConditionFlag.BetweenAreas]) return;
+            
+            var atmaEnabled = Service.Configuration.IsAtmaManagerEnabled;
             if (ImGui.Checkbox("Enable Atma Manager", ref atmaEnabled))
             {
                 Service.Configuration.IsAtmaManagerEnabled = atmaEnabled;
                 Service.Configuration.Save();
             }
 
+            var enabledOnlyRelicEquipped = Service.Configuration.EnableOnlyWhenRelicEquipped;
+            if (ImGui.Checkbox("Enable When Relic Equipped", ref enabledOnlyRelicEquipped))
+            {
+                Service.Configuration.EnableOnlyWhenRelicEquipped = enabledOnlyRelicEquipped;
+                Service.Configuration.Save();
+            }
+
             ImGui.Separator();
 
-            if (CompletedObjective)
-            {
-                UpdateStatusUIOnly();
-                return;
-            }
+            this.UpdateRelicButton();
+            
+            ImGui.Separator();
 
-            if (string.IsNullOrWhiteSpace(CurrentTarget))
+            UpdateStatusUIOnly();
+        }
+
+        private void UpdateRelicButton()
+        {
+            // Temporary Code
+            if (this.RelicBookGameItem.HasValue)
             {
-                ImGui.Text("No target selected.");
-            }
-            else
-            {
-                ImGui.Text($"Current Target: {CurrentTarget}");
-                ImGui.Text($"GameObjectId: {CurrentTargetId}");
-                if (CurrentTargetPosition.HasValue)
+                if (ImGui.Button("Open Book", new Vector2(this.SizeConstraints?.MinimumSize.X ?? 100, 35)))
                 {
-                    var pos = CurrentTargetPosition.Value;
-                    ImGui.Text($"Position: X: {pos.X:F1}, Y: {pos.Y:F1}, Z: {pos.Z:F1}");
+                    UseItem(this.RelicBookGameItem.Value);
                 }
             }
-
-            ImGui.Separator();
-
-            Vector4 color;
-            string status;
-
-            if (!VNavmesh.Nav.IsReady())
-            {
-                status = "Navmesh Not Ready";
-                color = new Vector4(1f, 0f, 0f, 1f);
-            }
-            else if (VNavmesh.Nav.PathfindInProgress())
-            {
-                status = "Generating Path...";
-                color = new Vector4(1f, 1f, 0f, 1f);
-            }
-            else if (VNavmesh.Path.IsRunning())
-            {
-                status = "Pathing";
-                color = new Vector4(0f, 1f, 0f, 1f);
-            }
             else
             {
-                status = "Idle";
-                color = new Vector4(1f, 1f, 1f, 1f);
+                ImGui.TextDisabled("No Relic Book Found");
             }
+        }
 
-            ImGui.TextColored(color, $"Status: {status}");
+        private static unsafe void UseItem(GameInventoryItem gameItem)
+        {
+            var agentModule = Framework.Instance()->GetUIModule()->GetAgentModule();
+            if (agentModule == null)
+                return;
 
-            string killStatus;
-            Vector4 killColor;
-
-            if (TargetingHelper.KillCount >= 3)
-            {
-                killStatus = "Kill Target Complete!";
-                killColor = new Vector4(0f, 1f, 0f, 1f);
-            }
-            else
-            {
-                killStatus = $"Kills: {TargetingHelper.KillCount} / 3";
-                killColor = new Vector4(1f, 1f, 1f, 1f);
-            }
-
-            ImGui.TextColored(killColor, killStatus);
+            Service.PluginLog.Debug($"RowId: {gameItem.ItemId}, " +
+                                    $"ContainerType: {gameItem.ContainerType}, " +
+                                    $"Slot: {gameItem.InventorySlot}");
+            
+            agentModule->GetAgentInventoryContext()->UseItem(gameItem.ItemId, 
+                (InventoryType) gameItem.ContainerType, gameItem.InventorySlot);
         }
 
         private void UpdateStatusUIOnly()
         {
-            ImGui.Text($"Current Target: {CurrentTarget}");
-            ImGui.Text($"Kills: {TargetingHelper.KillCount} / 3");
+            ImGui.Text(this.CurrentTarget.IsNullOrEmpty() ? "No target selected." : $"Target: {this.CurrentTarget}");
 
-            Vector4 statusColor;
-            string statusText;
+            if (!this.KillCount.IsNullOrEmpty())
+            {
+                if (CompletedObjective)
+                {
+                    ImGui.TextColored(new Vector4(0f, 1f, 0f, 1f), "Kill Target Complete!");
+                }
+                else
+                {
+                    ImGui.TextColored(new Vector4(1f, 1f, 1f, 1f), $"Kills: {this.KillCount}");
+                }
+            }
+            
+            ImGui.Separator();
 
             if (!VNavmesh.Nav.IsReady())
             {
-                statusText = "Navmesh Not Ready";
-                statusColor = new Vector4(1f, 0f, 0f, 1f);
+                ImGui.TextColored(new Vector4(1f, 0f, 0f, 1f), "Status: Navmesh Not Ready");
             }
             else if (VNavmesh.Nav.PathfindInProgress())
             {
-                statusText = "Generating Path...";
-                statusColor = new Vector4(1f, 1f, 0f, 1f);
+                ImGui.TextColored(new Vector4(1f, 1f, 0f, 1f), "Status: Generating Path...");
             }
             else if (VNavmesh.Path.IsRunning())
             {
-                statusText = "Pathing";
-                statusColor = new Vector4(0f, 1f, 0f, 1f);
+                ImGui.TextColored(new Vector4(0f, 1f, 0f, 1f), "Status: Pathing");
             }
             else
             {
-                statusText = "Idle";
-                statusColor = new Vector4(1f, 1f, 1f, 1f);
+                ImGui.TextColored(new Vector4(1f, 1f, 1f, 1f), "Status: Idle");
             }
+        }
 
-            ImGui.Separator();
-            ImGui.TextColored(statusColor, $"Status: {statusText}");
-            ImGui.TextColored(new Vector4(0f, 1f, 0f, 1f), "Kill Target Complete!");
+        public unsafe void SetTargetNode(AddonRelicNoteBook.TargetNode targetNode, BraveTarget enemy)
+        {
+            this.CurrentTarget = $"{SmartCaseHelper.SmartTitleCase(enemy.Name)}";
+            if (enemy is { ContentsFinderConditionId: 0, FateId: 0 } && enemy.Issuer.IsNullOrEmpty())
+                this.KillCount = $"{targetNode.CounterTextNode->GetText().ToString()}";
+            else 
+                this.KillCount = null;
         }
     }
 }
