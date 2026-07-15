@@ -1,7 +1,7 @@
+using System.Text.Json.Serialization;
 using Dalamud.Configuration;
 using Dalamud.Game.Text;
 using Newtonsoft.Json;
-using System.Text.Json.Serialization;
 using ZodiacBuddy.BonusLight;
 using ZodiacBuddy.InformationWindow;
 using ZodiacBuddy.Stages.Brave;
@@ -15,11 +15,12 @@ public class PluginConfiguration : IPluginConfiguration {
     [JsonProperty("BraveEchoChannel")] public XivChatType ChatType { get; set; } = XivChatType.Echo;
 
     public bool BraveEchoTarget { get; set; } = true;
-    public bool TargetInfoWindowWasOpen { get; set; } = false;
+    public bool TargetInfoWindowWasOpen { get; set; }
     public bool BraveCopyTarget { get; set; } = true;
 
     [JsonPropertyName("IsAtmaManagerEnabled")]
-    public bool IsAtmaManagerEnabled { get; set; } = false;
+    public bool IsAtmaManagerEnabled { get; set; }
+    
     public BonusLightConfiguration BonusLight { get; } = new();
 
     public NovusConfiguration Novus { get; } = new();

@@ -86,7 +86,7 @@ namespace ZodiacBuddy
 
                     if (rsrEnabled)
                     {
-                        Service.PluginLog.Debug("Kill complete — disabling RSR via /rotation off.");
+                        Service.PluginLog.Debug("Kill complete ï¿½ disabling RSR via /rotation off.");
                         Service.CommandManager.ProcessCommand("/rotation off");
                         rsrEnabled = false;
                     }
@@ -345,7 +345,7 @@ namespace ZodiacBuddy
 
         public override void Draw()
         {
-            bool atmaEnabled = Service.Configuration.IsAtmaManagerEnabled;
+            var atmaEnabled = Service.Configuration.IsAtmaManagerEnabled;
             if (ImGui.Checkbox("Enable Atma Manager", ref atmaEnabled))
             {
                 Service.Configuration.IsAtmaManagerEnabled = atmaEnabled;
