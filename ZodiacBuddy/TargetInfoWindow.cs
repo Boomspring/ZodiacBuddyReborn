@@ -404,9 +404,9 @@ namespace ZodiacBuddy
         public unsafe void SetTargetNode(AddonRelicNoteBook.TargetNode targetNode, BraveTarget enemy)
         {
             this.CurrentTarget = $"{SmartCaseHelper.SmartTitleCase(enemy.Name)}";
-            if (enemy.ContentsFinderConditionId == 0 && enemy.FateId == 0 && enemy.Issuer.IsNullOrEmpty())
+            if (enemy is { ContentsFinderConditionId: 0, FateId: 0 } && enemy.Issuer.IsNullOrEmpty())
                 this.KillCount = $"{targetNode.CounterTextNode->GetText().ToString()}";
-            else
+            else 
                 this.KillCount = null;
         }
     }

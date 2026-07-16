@@ -353,6 +353,9 @@ internal class AtmaManager : IDisposable {
             }
         }
 
+        if (Service.Plugin.TargetWindow.KillCount?.StartsWith('3') ?? false)
+            return;
+
         // Flag the target on the map
         var destinationPos = selectedTarget.Position;
         var agentMap = AgentMap.Instance();
@@ -424,7 +427,7 @@ internal class AtmaManager : IDisposable {
                 } 
                 return;
             }
-                
+
             this.Teleport(aetheryteId);
             this.ResetTeleportCycleFlags();
             if (this._awaitingTeleportFromRelicBookClick)
