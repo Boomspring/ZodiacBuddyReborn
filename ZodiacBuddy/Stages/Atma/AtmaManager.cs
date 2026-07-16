@@ -277,36 +277,83 @@ internal class AtmaManager : IDisposable {
             return;
         var bookId = relicNote->RelicNoteId;
         var index = addon->CategoryList->SelectedItemIndex;
-        var targetComponent = eventData->Target;
 
-        var selectedTarget = targetComponent switch
+        // Create lists of each type of target node.
+        List<AddonRelicNoteBook.TargetNode> EnemyTargetNodeList = new()
         {
-            // Enemies
-            _ when index == 0 && IsOwnerNode(targetComponent, addon->Enemy0.CheckBox) => BraveBook.GetValue(bookId).Enemies[0],
-            _ when index == 0 && IsOwnerNode(targetComponent, addon->Enemy1.CheckBox) => BraveBook.GetValue(bookId).Enemies[1],
-            _ when index == 0 && IsOwnerNode(targetComponent, addon->Enemy2.CheckBox) => BraveBook.GetValue(bookId).Enemies[2],
-            _ when index == 0 && IsOwnerNode(targetComponent, addon->Enemy3.CheckBox) => BraveBook.GetValue(bookId).Enemies[3],
-            _ when index == 0 && IsOwnerNode(targetComponent, addon->Enemy4.CheckBox) => BraveBook.GetValue(bookId).Enemies[4],
-            _ when index == 0 && IsOwnerNode(targetComponent, addon->Enemy5.CheckBox) => BraveBook.GetValue(bookId).Enemies[5],
-            _ when index == 0 && IsOwnerNode(targetComponent, addon->Enemy6.CheckBox) => BraveBook.GetValue(bookId).Enemies[6],
-            _ when index == 0 && IsOwnerNode(targetComponent, addon->Enemy7.CheckBox) => BraveBook.GetValue(bookId).Enemies[7],
-            _ when index == 0 && IsOwnerNode(targetComponent, addon->Enemy8.CheckBox) => BraveBook.GetValue(bookId).Enemies[8],
-            _ when index == 0 && IsOwnerNode(targetComponent, addon->Enemy9.CheckBox) => BraveBook.GetValue(bookId).Enemies[9],
-            // Dungeons
-            _ when index == 1 && IsOwnerNode(targetComponent, addon->Dungeon0.CheckBox) => BraveBook.GetValue(bookId).Dungeons[0],
-            _ when index == 1 && IsOwnerNode(targetComponent, addon->Dungeon1.CheckBox) => BraveBook.GetValue(bookId).Dungeons[1],
-            _ when index == 1 && IsOwnerNode(targetComponent, addon->Dungeon2.CheckBox) => BraveBook.GetValue(bookId).Dungeons[2],
-            // FATEs
-            _ when index == 2 && IsOwnerNode(targetComponent, addon->Fate0.CheckBox) => BraveBook.GetValue(bookId).Fates[0],
-            _ when index == 2 && IsOwnerNode(targetComponent, addon->Fate1.CheckBox) => BraveBook.GetValue(bookId).Fates[1],
-            _ when index == 2 && IsOwnerNode(targetComponent, addon->Fate2.CheckBox) => BraveBook.GetValue(bookId).Fates[2],
-            // Leves
-            _ when index == 3 && IsOwnerNode(targetComponent, addon->Leve0.CheckBox) => BraveBook.GetValue(bookId).Leves[0],
-            _ when index == 3 && IsOwnerNode(targetComponent, addon->Leve1.CheckBox) => BraveBook.GetValue(bookId).Leves[1],
-            _ when index == 3 && IsOwnerNode(targetComponent, addon->Leve2.CheckBox) => BraveBook.GetValue(bookId).Leves[2],
-            _ => throw new ArgumentException($"Unexpected index and/or node: {index}, {(nint)targetComponent:X}"),
+            addon->Enemy0,
+            addon->Enemy1,
+            addon->Enemy2,
+            addon->Enemy3,
+            addon->Enemy4,
+            addon->Enemy5,
+            addon->Enemy6,
+            addon->Enemy7,
+            addon->Enemy8,
+            addon->Enemy9
         };
         
+        List<AddonRelicNoteBook.TargetNode> DungeonTargetNodeList = new()
+        {
+            addon->Dungeon0,
+            addon->Dungeon1,
+            addon->Dungeon2
+        };
+        
+        List<AddonRelicNoteBook.TargetNode> FateTargetNodeList = new()
+        {
+            addon->Fate0,
+            addon->Fate1,
+            addon->Fate2
+        };
+        
+        List<AddonRelicNoteBook.TargetNode> LeveTargetNodeList = new()
+        {
+            addon->Leve0,
+            addon->Leve1,
+            addon->Leve2
+        };
+
+        // Check if the target node is selected.
+        BraveTarget selectedTarget = default;
+        
+        if (selectedTarget.Name.IsNullOrEmpty())
+        {
+            foreach (var node in EnemyTargetNodeList.Where(node => IsOwnerNode(eventData->Target, node.CheckBox)))
+            {
+                selectedTarget = BraveBook.GetValue(bookId).Enemies[EnemyTargetNodeList.IndexOf(node)];
+                Service.Plugin.TargetWindow.SetTargetNode(node, selectedTarget);
+            }
+        }
+
+        if (selectedTarget.Name.IsNullOrEmpty())
+        {
+            foreach (var node in DungeonTargetNodeList.Where(node => IsOwnerNode(eventData->Target, node.CheckBox)))
+            {
+                selectedTarget = BraveBook.GetValue(bookId).Dungeons[DungeonTargetNodeList.IndexOf(node)];
+                Service.Plugin.TargetWindow.SetTargetNode(node, selectedTarget);
+            }
+        }
+
+        if (selectedTarget.Name.IsNullOrEmpty())
+        {
+            foreach (var node in FateTargetNodeList.Where(node => IsOwnerNode(eventData->Target, node.CheckBox)))
+            {
+                selectedTarget = BraveBook.GetValue(bookId).Fates[FateTargetNodeList.IndexOf(node)];
+                Service.Plugin.TargetWindow.SetTargetNode(node, selectedTarget);
+            }
+        }
+        
+        if (selectedTarget.Name.IsNullOrEmpty())
+        {
+            foreach (var node in LeveTargetNodeList.Where(node => IsOwnerNode(eventData->Target, node.CheckBox)))
+            {
+                selectedTarget = BraveBook.GetValue(bookId).Leves[LeveTargetNodeList.IndexOf(node)];
+                Service.Plugin.TargetWindow.SetTargetNode(node, selectedTarget);
+            }
+        }
+
+        // Flag the target on the map
         var destinationPos = selectedTarget.Position;
         var agentMap = AgentMap.Instance();
         if (agentMap == null)
@@ -324,7 +371,7 @@ internal class AtmaManager : IDisposable {
         {
             var sb = new SeStringBuilder()
                 .AddText("Target selected: ")
-                .AddUiForeground(selectedTarget.Name, 62);
+                .AddUiForeground(SmartCaseUtil.SmartCaseHelper.SmartTitleCase(selectedTarget.Name), 62);
 
             if (index == 3) // leves
                 sb.AddText($" from {selectedTarget.Issuer}");
@@ -370,7 +417,11 @@ internal class AtmaManager : IDisposable {
             // Same zone (or teleport disabled): skip teleport and only start vnavmesh.
             if (Service.Configuration.DisableTeleport || Svc.ClientState.TerritoryType == destinationPos.TerritoryType.RowId)
             {
-                EnqueueMountUp(); // this uses /vnav flyflag, same as the teleport flow
+                if (this._pathingContext != PathingContext.Fate ||
+                    (_pendingFateId is { } wantId && TryGetLiveFateById(wantId, out _)))
+                { 
+                    EnqueueMountUp(); // this uses /vnav flyflag, same as the teleport flow
+                } 
                 return;
             }
                 
@@ -413,14 +464,13 @@ internal class AtmaManager : IDisposable {
     {
         foreach (var f in Svc.Fates)
         {
-            if (f.FateId == fateId)
-            {
-                if (f.State == FateState.Preparing) break;
-                fate = f;
-                return true;
-            }
+            if (f.FateId != fateId)
+                continue;
+
+            fate = f;
+            return true;
         }
-        fate = default!;
+        fate = null!;
         return false;
     }
     private void MonitorUnstuck(IFramework _)
