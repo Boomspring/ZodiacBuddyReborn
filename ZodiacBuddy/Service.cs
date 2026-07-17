@@ -18,7 +18,9 @@ public class Service {
     [PluginService] public static IToastGui Toasts { get; set; }
     [PluginService] public static IPluginLog PluginLog { get; set; }
     [PluginService] public static IAddonLifecycle AddonLifecycle { get; set; }
-    [PluginService] public static IFateTable FateTable { get; set; }
+    
+    [PluginService] public static IObjectTable ObjectTable { get; set; }
+    [PluginService] public static ITargetManager TargetManager { get; set; }
     public static ZodiacBuddyPlugin Plugin { get; set; } = null!;
     public static PluginConfiguration Configuration { get; set; } = null!;
     public static BonusLightManager BonusLightManager { get; set; } = null!;

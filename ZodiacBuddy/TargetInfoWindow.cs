@@ -11,6 +11,7 @@ using System;
 using Dalamud.Utility;
 using ZodiacBuddy.Stages.Atma;
 using ECommons.GameHelpers;
+using FFXIVClientStructs.FFXIV.Client.Game;
 using FFXIVClientStructs.FFXIV.Client.UI;
 using ZodiacBuddy.SmartCaseUtil;
 using ZodiacBuddy.Stages.Atma.Data;
@@ -118,15 +119,27 @@ namespace ZodiacBuddy
                     this._pendingPathing = false;
                 }
             }
-            if (this._pendingPathing && !VNavmesh.Path.IsRunning() && (DateTime.Now - this._lastPathingTime).TotalSeconds > 2)
+            else
             {
-                StartPathingToCurrentTarget();
+                this._pendingPathing = !Svc.Condition[ConditionFlag.InCombat];
+                
+                if (this._pendingPathing && !VNavmesh.Path.IsRunning() && (DateTime.Now - this._lastPathingTime).TotalSeconds > 2)
+                {
+                    StartPathingToCurrentTarget();
+
+                    unsafe
+                    {
+                        var am = ActionManager.Instance();
+                        this._taskManager.Enqueue(() =>
+                        {
+                            if (Svc.Condition[ConditionFlag.Mounted])
+                                am->UseAction(ActionType.Mount, 0);
+                        }, "Dismount");
+                    }
+                    
+                    UpdateCurrentTargetInfo();
+                }
             }
-            UpdateCurrentTargetInfo();
-            // if (!CompletedObjective)
-            // {
-                // TargetingHelper.AutoTargetStoredIdIfVisible();
-            // }
         }
         
         public void SetTarget(string name, ulong id = 0)
@@ -241,12 +254,15 @@ namespace ZodiacBuddy
             
                 if (match != null)
                 {
+                    if (!Svc.Condition[ConditionFlag.InCombat])
+                    {
+                        Service.TargetManager.Target = Service.ObjectTable.SearchById(match.GameObjectId);
+                    }
+                    
                     // Only switch if current ID is 0 or the current target is no longer valid
                     if (this._currentTargetId == 0)
                     {
                         this._currentTargetId = match.GameObjectId;
-                        // TargetingHelper.StoredTargetId = match.GameObjectId;
-                        // TargetingHelper.ResetAutoTargetFlag();
                         Service.PluginLog.Debug($"Set new target ID: {this._currentTargetId}");
                     }
                     else if (match.GameObjectId != this._currentTargetId)

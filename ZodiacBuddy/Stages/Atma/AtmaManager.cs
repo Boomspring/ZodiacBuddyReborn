@@ -136,6 +136,7 @@ internal partial class AtmaManager : IDisposable {
                     mt => string.Equals(m.Groups[1].Value, mt.Value.BNpcName.Value.Singular.ExtractText(), 
                     StringComparison.OrdinalIgnoreCase), out var monsterTarget))
             {
+                this._pathingContext = PathingContext.Enemy;
                 this.FlagTargetOnMap(BraveBook.GetMonsterPosition(monsterTarget.RowId));
                 Service.Plugin.TargetWindow.SetTarget(m.Groups[1].Value);
                 Service.Plugin.TargetWindow.KillCount = m.Groups[2].Value;
@@ -763,11 +764,6 @@ internal partial class AtmaManager : IDisposable {
                         {
                             VNavmesh.SimpleMove.PathfindAndMoveTo(ToSys(ffxPos), false);
                         }
-                        //else
-                        //{
-                            // Optional FALLBACK(commed out for if i need it later)
-                            //Chat.ExecuteCommand("/vnav moveflag");
-                        //}
                         return true;
                     });
 
