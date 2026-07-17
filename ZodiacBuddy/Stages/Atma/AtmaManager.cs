@@ -68,7 +68,6 @@ internal partial class AtmaManager : IDisposable {
     private UnstuckPhase _unstuckPhase = UnstuckPhase.Idle;
     private Vector3 _armPos;
     private PathingContext _resumeContext = PathingContext.None;
-    public Vector3? CurrentTargetPosition { get; set; }
     public bool IsPathGenerating => VNavmesh.Nav.PathfindInProgress();
     public bool IsPathing => VNavmesh.Path.IsRunning();
     public bool NavReady => VNavmesh.Nav.IsReady();
@@ -346,7 +345,7 @@ internal partial class AtmaManager : IDisposable {
         if (selectedTarget == null || selectedNode == null)
             return;
 
-        if (Service.Plugin.TargetWindow.KillCount?.StartsWith('3') ?? false)
+        if (Service.Plugin.TargetWindow.CompletedObjective)
             return;
 
         // Flag the target on the map
@@ -739,9 +738,7 @@ internal partial class AtmaManager : IDisposable {
                         if (VNavmesh.Nav.PathfindInProgress() || VNavmesh.Path.IsRunning())
                             return true;
 
-                        var tWin = Service.Plugin.TargetWindow;
-                        var posOpt = tWin.CurrentTargetPosition;
-                        if (posOpt is { } ffxPos)
+                        if (Service.Plugin.TargetWindow.CurrentTargetPosition is { } ffxPos)
                         {
                             VNavmesh.SimpleMove.PathfindAndMoveTo(ToSys(ffxPos), false);
                         }
@@ -780,10 +777,7 @@ internal partial class AtmaManager : IDisposable {
         {
             case PathingContext.Enemy:
                 {
-                    var tWin = Service.Plugin.TargetWindow;
-                    var posOpt = tWin.CurrentTargetPosition;
-
-                    if (posOpt is { } ffxPos)
+                    if (Service.Plugin.TargetWindow.CurrentTargetPosition is { } ffxPos)
                     {
                         var sysPos = ToSys(ffxPos);
                         Service.PluginLog.Debug($"[ZodiacBuddy] Restart nav (Enemy): nudging toward TargetWindow pos {sysPos}.");
