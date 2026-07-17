@@ -367,7 +367,7 @@ namespace ZodiacBuddy
 
         private void UpdateStatusUIOnly()
         {
-            ImGui.Text(this.CurrentTarget.IsNullOrEmpty() ? "No target selected." : $"Current Target: {this.CurrentTarget}");
+            ImGui.Text(this.CurrentTarget.IsNullOrEmpty() ? "No target selected." : $"Target: {this.CurrentTarget}");
 
             if (this.KillCount.IsNullOrEmpty())
                 return;

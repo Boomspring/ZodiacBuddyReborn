@@ -6,6 +6,7 @@ using System.Text;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Game.Addon.Lifecycle;
 using Dalamud.Game.Addon.Lifecycle.AddonArgTypes;
+using Dalamud.Game.Chat;
 using Dalamud.Game.ClientState.Conditions;
 using Dalamud.Game.ClientState.Fates;
 using Dalamud.Game.Text.SeStringHandling;
@@ -27,12 +28,14 @@ using ZodiacBuddy.Stages.Atma.Data;
 using Action = System.Action;
 using FFXVec3 = FFXIVClientStructs.FFXIV.Common.Math.Vector3;
 using RelicNote = FFXIVClientStructs.FFXIV.Client.Game.UI.RelicNote;
+using System.Text.RegularExpressions;
+using Dalamud.Game.Text;
 
 namespace ZodiacBuddy.Stages.Atma;
 /// <summary>
 /// Your buddy for the Atma enhancement stage.
 /// </summary>
-internal class AtmaManager : IDisposable {
+internal partial class AtmaManager : IDisposable {
     /// <summary>
     /// Initializes a new instance of the <see cref="AtmaManager"/> class.
     /// </summary>
@@ -104,6 +107,7 @@ internal class AtmaManager : IDisposable {
 
         Service.AddonLifecycle.RegisterListener(AddonEvent.PostReceiveEvent, "RelicNoteBook", ReceiveEventDetour);
         Svc.Framework.Update += _advancedUnstuck.RunningUpdate;
+        Service.ChatGui.ChatMessage += OnChatMessage;
     }
     /// <inheritdoc/>
     public void Dispose() {
@@ -111,10 +115,25 @@ internal class AtmaManager : IDisposable {
         Svc.Framework.Update -= WaitForBetweenAreasAndExecute;
         Svc.Framework.Update -= MonitorPathingAndDismount;
         Svc.Framework.Update -= _advancedUnstuck.RunningUpdate;
+        Service.ChatGui.ChatMessage -= OnChatMessage;
         Service.AddonLifecycle.UnregisterListener(ReceiveEventDetour);
         _advancedUnstuck.OnUnstuckComplete -= OnUnstuckCompleteHandler;
         _advancedUnstuck.Dispose();
     }
+
+    private void OnChatMessage(IHandleableChatMessage message)
+    {
+        if (message.LogKind != XivChatType.SystemMessage)
+            return;
+
+        var m = MyRegex().Match(message.Message.TextValue);
+        if (!m.Success)
+            return;
+        
+        Service.Plugin.TargetWindow.CurrentTarget = SmartCaseUtil.SmartCaseHelper.SmartTitleCase(m.Groups[1].Value);
+        Service.Plugin.TargetWindow.KillCount = m.Groups[2].Value;
+    }
+    
     private static uint GetNearestAetheryte(MapLinkPayload mapLink) {
         var closestAetheryteId = 0u;
         var closestDistance = double.MaxValue;
@@ -315,69 +334,43 @@ internal class AtmaManager : IDisposable {
         };
 
         // Check if the target node is selected.
-        BraveTarget selectedTarget = default;
-        
-        if (selectedTarget.Name.IsNullOrEmpty())
+        var braveBook = BraveBook.GetValue(bookId);
+
+        if (TrySelectTarget(EnemyTargetNodeList, braveBook.Enemies, out var selectedNode, out var selectedTarget)
+            || TrySelectTarget(DungeonTargetNodeList, braveBook.Dungeons, out selectedNode, out selectedTarget)
+            || TrySelectTarget(FateTargetNodeList, braveBook.Fates, out selectedNode, out selectedTarget)
+            || TrySelectTarget(LeveTargetNodeList, braveBook.Leves, out selectedNode, out selectedTarget))
         {
-            foreach (var node in EnemyTargetNodeList.Where(node => IsOwnerNode(eventData->Target, node.CheckBox)))
-            {
-                selectedTarget = BraveBook.GetValue(bookId).Enemies[EnemyTargetNodeList.IndexOf(node)];
-                Service.Plugin.TargetWindow.SetTargetNode(node, selectedTarget);
-            }
         }
 
-        if (selectedTarget.Name.IsNullOrEmpty())
-        {
-            foreach (var node in DungeonTargetNodeList.Where(node => IsOwnerNode(eventData->Target, node.CheckBox)))
-            {
-                selectedTarget = BraveBook.GetValue(bookId).Dungeons[DungeonTargetNodeList.IndexOf(node)];
-                Service.Plugin.TargetWindow.SetTargetNode(node, selectedTarget);
-            }
-        }
-
-        if (selectedTarget.Name.IsNullOrEmpty())
-        {
-            foreach (var node in FateTargetNodeList.Where(node => IsOwnerNode(eventData->Target, node.CheckBox)))
-            {
-                selectedTarget = BraveBook.GetValue(bookId).Fates[FateTargetNodeList.IndexOf(node)];
-                Service.Plugin.TargetWindow.SetTargetNode(node, selectedTarget);
-            }
-        }
-        
-        if (selectedTarget.Name.IsNullOrEmpty())
-        {
-            foreach (var node in LeveTargetNodeList.Where(node => IsOwnerNode(eventData->Target, node.CheckBox)))
-            {
-                selectedTarget = BraveBook.GetValue(bookId).Leves[LeveTargetNodeList.IndexOf(node)];
-                Service.Plugin.TargetWindow.SetTargetNode(node, selectedTarget);
-            }
-        }
+        if (selectedTarget == null || selectedNode == null)
+            return;
 
         if (Service.Plugin.TargetWindow.KillCount?.StartsWith('3') ?? false)
             return;
 
         // Flag the target on the map
-        var destinationPos = selectedTarget.Position;
+        var destinationPos = selectedTarget?.Position;
         var agentMap = AgentMap.Instance();
-        if (agentMap == null)
+        if (agentMap == null || destinationPos == null)
             return;
         agentMap->FlagMarkerCount = 0;
         agentMap->SetFlagMapMarker(destinationPos.TerritoryType.RowId, destinationPos.Map.RowId,
             destinationPos.RawX * destinationPos.Map.Value.SizeFactor / 100000.0f, 
             destinationPos.RawY * destinationPos.Map.Value.SizeFactor / 100000.0f);
 
-        var zoneName = !string.IsNullOrEmpty(selectedTarget.LocationName)
-            ? $"{selectedTarget.LocationName}, {selectedTarget.ZoneName}"
-            : selectedTarget.ZoneName;
+        var zoneName = !string.IsNullOrEmpty(selectedTarget?.LocationName)
+            ? $"{selectedTarget?.LocationName}, {selectedTarget?.ZoneName}"
+            : selectedTarget?.ZoneName;
 
         if (Service.Configuration.BraveEchoTarget)
         {
             var sb = new SeStringBuilder()
                 .AddText("Target selected: ")
-                .AddUiForeground(SmartCaseUtil.SmartCaseHelper.SmartTitleCase(selectedTarget.Name), 62);
+                .AddUiForeground(SmartCaseUtil.SmartCaseHelper.SmartTitleCase(selectedTarget!.Value.Name), 62);
 
             if (index == 3) // leves
-                sb.AddText($" from {selectedTarget.Issuer}");
+                sb.AddText($" from {selectedTarget?.Issuer}");
 
             sb.AddText($" in {zoneName}.");
 
@@ -386,8 +379,8 @@ internal class AtmaManager : IDisposable {
 
         if (Service.Configuration.BraveCopyTarget)
         {
-            Service.Plugin.PrintMessage($"Copied {selectedTarget.Name} to clipboard.");
-            ImGui.SetClipboardText(selectedTarget.Name);
+            Service.Plugin.PrintMessage($"Copied {selectedTarget?.Name} to clipboard.");
+            ImGui.SetClipboardText(selectedTarget?.Name);
 
         }
         
@@ -398,17 +391,17 @@ internal class AtmaManager : IDisposable {
         {
             if (this._pathingContext == PathingContext.Fate)
             {
-                if (FateNameToId.TryGetValue(Normalize(selectedTarget.Name), out var fateId))
+                if (FateNameToId.TryGetValue(Normalize(selectedTarget!.Value.Name), out var fateId))
                 {
                     this._pendingFateId = fateId;
                     Service.PluginLog.Debug(
-                        $"[ZBR] Pending FateId set to {this._pendingFateId.Value} for '{selectedTarget.Name}'.");
+                        $"[ZBR] Pending FateId set to {this._pendingFateId.Value} for '{selectedTarget?.Name}'.");
                 }
                 else Service.PluginLog.Warning(
-                    $"[ZBR] Unknown FATE name '{selectedTarget.Name}' - cannot resolve FateId.");
+                    $"[ZBR] Unknown FATE name '{selectedTarget?.Name}' - cannot resolve FateId.");
             }
                 
-            Service.Plugin.TargetWindow.SetTarget(selectedTarget.Name);
+            Service.Plugin.TargetWindow.SetTarget(selectedTarget!.Value.Name);
 
             var aetheryteId = GetNearestAetheryte(destinationPos);
             if (aetheryteId == 0)
@@ -438,8 +431,8 @@ internal class AtmaManager : IDisposable {
             return;
         }
 
-        var cfcId = selectedTarget.ContentsFinderConditionId;
-        var territoryId = selectedTarget.Position.TerritoryType.RowId;
+        var cfcId = selectedTarget!.Value.ContentsFinderConditionId;
+        var territoryId = selectedTarget!.Value.Position.TerritoryType.RowId;
         var started = false;
             
         if (AutoDutyIpc.Enabled)
@@ -456,12 +449,38 @@ internal class AtmaManager : IDisposable {
 
         if (started)
         {
-            Service.Plugin.PrintMessage($"AutoDuty: starting unsynced for {selectedTarget.Name}.");
+            Service.Plugin.PrintMessage($"AutoDuty: starting unsynced for {selectedTarget?.Name}.");
             return;
         }
 
         AgentContentsFinder.Instance()->OpenRegularDuty(cfcId);
-        Service.Plugin.PrintMessage($"AutoDuty unavailable. Opened Duty Finder for {selectedTarget.Name}.");
+        Service.Plugin.PrintMessage($"AutoDuty unavailable. Opened Duty Finder for {selectedTarget?.Name}.");
+        return;
+
+        bool TrySelectTarget(
+            List<AddonRelicNoteBook.TargetNode> targetNodes,
+            BraveTarget[] targets,
+            out AddonRelicNoteBook.TargetNode? matchedNode,
+            out BraveTarget? matchedTarget)
+        {
+            matchedNode = default;
+            matchedTarget = default;
+
+            for (var targetIndex = 0; targetIndex < targetNodes.Count; targetIndex++)
+            {
+                var node = targetNodes[targetIndex];
+
+                if (!IsOwnerNode(eventData->Target, node.CheckBox))
+                    continue;
+
+                matchedNode = node;
+                matchedTarget = targets[targetIndex];
+                Service.Plugin.TargetWindow.SetTargetNode(matchedNode.Value, matchedTarget.Value);
+                return true;
+            }
+
+            return false;
+        }
     }
     private static bool TryGetLiveFateById(ushort fateId, out IFate fate)
     {
@@ -866,4 +885,7 @@ internal class AtmaManager : IDisposable {
     }
     static unsafe bool IsOwnerNode(AtkEventTarget* target, AtkComponentCheckBox* checkbox)
             => target == checkbox->AtkComponentButton.OwnerNode;
-    }
+    
+    [GeneratedRegex(@"^Record of (.+?) kill \((\d+\/\d+)\) added for .*$", RegexOptions.IgnoreCase | RegexOptions.Compiled, "en-GB")]
+    private static partial Regex MyRegex();
+}
