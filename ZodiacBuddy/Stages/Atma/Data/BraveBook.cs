@@ -160,7 +160,7 @@ internal struct BraveBook {
         }
     }
 
-    private static MapLinkPayload GetMonsterPosition(uint monsterTargetId) {
+    public static MapLinkPayload GetMonsterPosition(uint monsterTargetId) {
         return monsterTargetId switch {
             356 => new MapLinkPayload( 152,   5, 28.2f, 12.9f), // sylpheed screech        // East Shroud
             357 => new MapLinkPayload( 156,  25, 17.0f, 16.0f), // daring harrier          // Mor Dhona

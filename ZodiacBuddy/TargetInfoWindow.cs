@@ -23,7 +23,7 @@ namespace ZodiacBuddy
         public string? KillCount;
         public bool CompletedObjective => this.KillCount?.StartsWith('3') ?? false;
         public Vector3? CurrentTargetPosition { get; private set; }
-        
+
         // Ones that already existed
         private readonly TaskManager _taskManager = new();
         private ulong _currentTargetId;
@@ -34,7 +34,10 @@ namespace ZodiacBuddy
         public TargetInfoWindow() : base("ZodiacBuddy Target Info", ImGuiWindowFlags.AlwaysAutoResize)
         {
             this.IsOpen = Service.Configuration.TargetInfoWindowWasOpen;
-
+            SizeConstraints = new WindowSizeConstraints
+            {
+                MinimumSize = new Vector2(225, 75),
+            };
             Svc.Framework.Update += OnFrameworkUpdate;
         }
         public override void OnOpen()
@@ -132,7 +135,7 @@ namespace ZodiacBuddy
             if (State == TargetingState.Active)
                 return;
             
-            // CurrentTarget = SmartCaseHelper.SmartTitleCase(name);
+            CurrentTarget = SmartCaseHelper.SmartTitleCase(name);
             this._currentTargetId = id;
             CurrentTargetPosition = null;
             

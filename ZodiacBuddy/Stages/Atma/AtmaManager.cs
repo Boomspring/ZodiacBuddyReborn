@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Numerics;
 using System.Text;
@@ -129,8 +130,21 @@ internal partial class AtmaManager : IDisposable {
         if (!m.Success)
             return;
         
-        Service.Plugin.TargetWindow.CurrentTarget = SmartCaseUtil.SmartCaseHelper.SmartTitleCase(m.Groups[1].Value);
-        Service.Plugin.TargetWindow.KillCount = m.Groups[2].Value;
+        foreach (var bookRow in Service.DataManager.GetExcelSheet<Lumina.Excel.Sheets.RelicNote>())
+        {
+            if (bookRow.MonsterNoteTargetCommon.TryGetFirst(
+                    mt => string.Equals(m.Groups[1].Value, mt.Value.BNpcName.Value.Singular.ExtractText(), 
+                    StringComparison.OrdinalIgnoreCase), out var monsterTarget))
+            {
+                this.FlagTargetOnMap(BraveBook.GetMonsterPosition(monsterTarget.RowId));
+                Service.Plugin.TargetWindow.SetTarget(m.Groups[1].Value);
+                Service.Plugin.TargetWindow.KillCount = m.Groups[2].Value;
+                break;
+            }
+        }
+
+        if (!Service.Plugin.TargetWindow.CompletedObjective)
+            this.RestartNavigationToTarget();
     }
     
     private static uint GetNearestAetheryte(MapLinkPayload mapLink) {
@@ -341,22 +355,15 @@ internal partial class AtmaManager : IDisposable {
             || TrySelectTarget(LeveTargetNodeList, braveBook.Leves, out selectedNode, out selectedTarget))
         {
         }
+        
+        this.ResetRunStateForNewCycle();
+        IndexToPathingContext.TryGetValue(index, out _pathingContext);
 
-        if (selectedTarget == null || selectedNode == null)
+        if (selectedTarget == null || selectedNode == null || Service.Plugin.TargetWindow.CompletedObjective)
             return;
 
-        if (Service.Plugin.TargetWindow.CompletedObjective)
-            return;
-
-        // Flag the target on the map
-        var destinationPos = selectedTarget?.Position;
-        var agentMap = AgentMap.Instance();
-        if (agentMap == null || destinationPos == null)
-            return;
-        agentMap->FlagMarkerCount = 0;
-        agentMap->SetFlagMapMarker(destinationPos.TerritoryType.RowId, destinationPos.Map.RowId,
-            destinationPos.RawX * destinationPos.Map.Value.SizeFactor / 100000.0f, 
-            destinationPos.RawY * destinationPos.Map.Value.SizeFactor / 100000.0f);
+        var destinationPos = selectedTarget.Value.Position;
+        this.FlagTargetOnMap(destinationPos);
 
         var zoneName = !string.IsNullOrEmpty(selectedTarget?.LocationName)
             ? $"{selectedTarget?.LocationName}, {selectedTarget?.ZoneName}"
@@ -382,9 +389,6 @@ internal partial class AtmaManager : IDisposable {
             ImGui.SetClipboardText(selectedTarget?.Name);
 
         }
-        
-        this.ResetRunStateForNewCycle();
-        IndexToPathingContext.TryGetValue(index, out _pathingContext);
 
         if (index != 1)
         {
@@ -481,6 +485,23 @@ internal partial class AtmaManager : IDisposable {
             return false;
         }
     }
+
+    protected unsafe void FlagTargetOnMap(MapLinkPayload position)
+    {
+        // Flag the target on the map
+        var agentMap = AgentMap.Instance();
+        if (agentMap == null)
+            return;
+
+        agentMap->FlagMarkerCount = 0;
+        if (!Service.Plugin.TargetWindow.CompletedObjective && _pathingContext != PathingContext.None)
+        {
+            agentMap->SetFlagMapMarker(position.TerritoryType.RowId, position.Map.RowId,
+                position.RawX * position.Map.Value.SizeFactor / 100000.0f, 
+                position.RawY * position.Map.Value.SizeFactor / 100000.0f);
+        }
+    }
+
     private static bool TryGetLiveFateById(ushort fateId, out IFate fate)
     {
         foreach (var f in Svc.Fates)
