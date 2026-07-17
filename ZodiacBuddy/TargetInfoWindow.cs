@@ -127,15 +127,7 @@ namespace ZodiacBuddy
                 {
                     StartPathingToCurrentTarget();
 
-                    unsafe
-                    {
-                        var am = ActionManager.Instance();
-                        this._taskManager.Enqueue(() =>
-                        {
-                            if (Svc.Condition[ConditionFlag.Mounted])
-                                am->UseAction(ActionType.Mount, 0);
-                        }, "Dismount");
-                    }
+                    this._taskManager.Enqueue(() => AtmaManager.Dismount, "Dismount");
                     
                     UpdateCurrentTargetInfo();
                 }

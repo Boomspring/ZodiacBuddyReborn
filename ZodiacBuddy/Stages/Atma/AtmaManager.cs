@@ -100,6 +100,30 @@ internal partial class AtmaManager : IDisposable {
                    && (!c[85] || c[ConditionFlag.Gathering]);
         }
     }
+    public static unsafe bool Mount
+    {
+        get
+        {
+            if (Svc.Condition[ConditionFlag.Mounted]) return true;
+            var am = ActionManager.Instance();
+            const uint rouletteId = 9;
+            if (am->GetActionStatus(ActionType.GeneralAction, rouletteId) == 0)
+                am->UseAction(ActionType.GeneralAction, rouletteId);
+            return true;
+        }
+    }
+    public static unsafe bool Dismount
+    {
+        get
+        {
+            if (!Svc.Condition[ConditionFlag.Mounted]) return true;
+            var am = ActionManager.Instance();
+            if (am->GetActionStatus(ActionType.Mount, 0) == 0)
+                am->UseAction(ActionType.Mount, 0);
+            return true;
+        }
+    }
+    
     public AtmaManager() 
     {
         _advancedUnstuck = new AdvancedUnstuck();
@@ -616,37 +640,37 @@ internal partial class AtmaManager : IDisposable {
         this._awaitingTeleportFromRelicBookClick = false;
         Svc.Framework.Update -= WaitForBetweenAreasAndExecute;
     }
-    private unsafe void EnqueueMountAndFlyTo(Vector3 destination)
+    private void EnqueueMountAndFlyTo(Vector3 dest)
     {
-        this._taskManager.Enqueue(() => NavReady);
-        // Mount (skip if already mounted)
-        this._taskManager.Enqueue(() =>
+        var pFloor = VNavmesh.Query.Mesh.PointOnFloor(dest, true, 1.0f);
+        var onMesh = VNavmesh.Query.Mesh.IsPointOnMesh(
+            pFloor,
+            0.5f,
+            false
+        );
+        
+        this._taskManager.Enqueue(() => NavReady, "NavReady");
+        if (!onMesh)
         {
-            if (Svc.Condition[ConditionFlag.Mounted]) return true;
-            var am = ActionManager.Instance();
-            const uint rouletteId = 9;
-            if (am->GetActionStatus(ActionType.GeneralAction, rouletteId) == 0)
-                am->UseAction(ActionType.GeneralAction, rouletteId);
-            return true;
-        });
-        this._taskManager.Enqueue(() => _advancedUnstuck.IsRunning || Svc.Condition[ConditionFlag.Mounted]);
+            this._taskManager.Enqueue(() => Mount, "Mount");
+            this._taskManager.Enqueue(() => _advancedUnstuck.IsRunning || Svc.Condition[ConditionFlag.Mounted]);
+            this._taskManager.Enqueue(() =>
+            {
+                // Extra delay after teleport to avoid racing the client state
+                this._taskManager.DelayNextImmediate(PostTeleportVnavDelayMs);
+                // If mount dropped during the delay, keep waiting
+                return Svc.Condition[ConditionFlag.Mounted] || _advancedUnstuck.IsRunning;
+            });
+        }
         
         this._taskManager.Enqueue(() =>
-        {
-            // Extra delay after teleport to avoid racing the client state
-            this._taskManager.DelayNextImmediate(PostTeleportVnavDelayMs);
-            // If mount dropped during the delay, keep waiting
-            return Svc.Condition[ConditionFlag.Mounted] || _advancedUnstuck.IsRunning;
-        });
+            {
+                if (!_advancedUnstuck.IsRunning)
+                    return false;
 
-        this._taskManager.Enqueue(() =>
-        {
-            if (!_advancedUnstuck.IsRunning && !Svc.Condition[ConditionFlag.Mounted])
-                return false;
-
-            VNavmesh.SimpleMove.PathfindAndMoveTo(destination, true);
-            EnqueueUnmountAfterNav();
-            return true;
+                VNavmesh.SimpleMove.PathfindAndMoveTo(pFloor, !onMesh);
+                EnqueueUnmountAfterNav();
+                return true;
         });
     }
     private unsafe void EnqueueMountUp()
@@ -796,22 +820,19 @@ internal partial class AtmaManager : IDisposable {
                 {
                     if (Service.Plugin.TargetWindow.CurrentTargetPosition is { } ffxPos)
                     {
-                        var sysPos = ToSys(ffxPos);
-                        Service.PluginLog.Debug($"[ZodiacBuddy] Restart nav (Enemy): nudging toward TargetWindow pos {sysPos}.");
-                        VNavmesh.SimpleMove.PathfindAndMoveTo(sysPos, false);
+                        EnqueueMountAndFlyTo(ffxPos);
                     }
                     else
                     {
                         Service.PluginLog.Debug("[ZodiacBuddy] Restart nav (Enemy): no TargetWindow pos; using /vnav flyflag.");
                         Chat.ExecuteCommand("/vnav moveflag");
                     }
-                    break;
                 }
-
+                break;
             case PathingContext.Fate:
                 if (_pendingFateId is { } wantId && TryGetLiveFateById(wantId, out var liveFate))
                 {
-                    VNavmesh.SimpleMove.PathfindAndMoveTo(liveFate.Position, true);
+                    EnqueueMountAndFlyTo(liveFate.Position);
                 }
                 break;
 
@@ -837,11 +858,7 @@ internal partial class AtmaManager : IDisposable {
             return;
         }
         var am = ActionManager.Instance();
-        this._taskManager.Enqueue(() =>
-        {
-            if (Svc.Condition[ConditionFlag.Mounted])
-                am->UseAction(ActionType.Mount, 0);
-        }, "Dismount");
+        this._taskManager.Enqueue(() => Dismount, "Dismount");
         this._taskManager.Enqueue(() =>
         {
             if (_advancedUnstuck.IsRunning)
@@ -851,11 +868,7 @@ internal partial class AtmaManager : IDisposable {
             }
             return !Svc.Condition[ConditionFlag.InFlight] && CanAct;
         }, 1000, "Wait for not in flight");
-        this._taskManager.Enqueue(() =>
-        {
-            if (Svc.Condition[ConditionFlag.Mounted])
-                am->UseAction(ActionType.Mount, 0);
-        }, "Dismount 2");
+        this._taskManager.Enqueue(() => Dismount, "Dismount 2");
         this._taskManager.Enqueue(() =>
         {
             if (_advancedUnstuck.IsRunning)

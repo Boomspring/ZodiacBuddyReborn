@@ -162,6 +162,7 @@ internal static class VNavmesh
                 EzIPC.Init(typeof(Mesh), "vnavmesh");
                 Debug.Assert(NearestPoint != null);
                 Debug.Assert(PointOnFloor != null);
+                Debug.Assert(IsPointOnMesh != null);
             }
 
             [EzIPC("vnavmesh.Query.Mesh.NearestPoint", applyPrefix: false)]
@@ -169,6 +170,9 @@ internal static class VNavmesh
 
             [EzIPC("vnavmesh.Query.Mesh.PointOnFloor", applyPrefix: false)]
             internal static readonly Func<Vector3, bool, float, Vector3> PointOnFloor;
+            
+            [EzIPC("vnavmesh.Query.Mesh.IsPointOnMesh", applyPrefix: false)]
+            internal static readonly Func<Vector3, float, bool, bool> IsPointOnMesh;
         }
     }
 
