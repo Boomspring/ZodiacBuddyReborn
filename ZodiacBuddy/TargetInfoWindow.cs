@@ -88,8 +88,6 @@ namespace ZodiacBuddy
             
                     this._currentTargetId = 0;
                     CurrentTargetPosition = null;
-                    // TargetingHelper.StoredTargetId = 0;
-                    // TargetingHelper.ResetAutoTargetFlag();
             
                     if (this._rsrEnabled)
                     {
@@ -102,7 +100,6 @@ namespace ZodiacBuddy
                 // Handle post-kill combat case
                 if (Svc.Condition[ConditionFlag.InCombat])
                 {
-                    // TargetingHelper.PromoteAggroingEnemy();
                     this._pendingPathing = false;
             
                     if (!this._rsrEnabled)
@@ -147,15 +144,6 @@ namespace ZodiacBuddy
             this._currentTargetId = id;
             CurrentTargetPosition = null;
             
-            // if (!string.IsNullOrWhiteSpace(name))
-            //     TargetingHelper.StartKillTracking(name);
-            
-            // if (id != 0)
-            // {
-            //     TargetingHelper.StoredTargetId = id;
-            //     TargetingHelper.ResetAutoTargetFlag();
-            // }
-            
             State = TargetingState.AwaitingAtmaPathing;
         }
 
@@ -197,7 +185,7 @@ namespace ZodiacBuddy
 
                 VNavmesh.SimpleMove.PathfindAndMoveTo(pos, false);
             
-                Service.ChatGui.Print($"Pathing to {CurrentTarget} at ({pos.X:F1}, {pos.Y:F1}, {pos.Z:F1})");
+                Service.PluginLog.Debug($"Pathing to {CurrentTarget} at ({pos.X:F1}, {pos.Y:F1}, {pos.Z:F1})");
                 this._lastPathingTime = DateTime.Now;
                 this._pendingPathing = false;
             }
@@ -211,7 +199,7 @@ namespace ZodiacBuddy
                 var fallbackCommand = "/vnav moveflag";
                 Service.PluginLog.Debug($"Issuing fallback pathing: {fallbackCommand}");
                 Service.CommandManager.ProcessCommand(fallbackCommand);
-                Service.ChatGui.Print("No enemy found nearby. Pathing to map flag.");
+                Service.Plugin.PrintMessage("No enemy found nearby. Pathing to map flag.");
                 AtmaManager.OnFallbackPathIssued?.Invoke();
                 this._lastPathingTime = DateTime.Now;
                 this._pendingPathing = false;
@@ -230,15 +218,13 @@ namespace ZodiacBuddy
             
                 foreach (var obj in Svc.Objects)
                 {
-                    if (obj.ObjectKind != ObjectKind.BattleNpc)
+                    if (obj.ObjectKind != ObjectKind.BattleNpc ||
+                        obj is not ICharacter { CurrentHp: > 0 } c ||
+                        !obj.Name.TextValue.Equals(this.CurrentTarget, StringComparison.OrdinalIgnoreCase))
+                    {
                         continue;
-                    if (obj is not ICharacter c)
-                        continue;
-                    if (c.CurrentHp <= 0)
-                        continue;
-                    if (!obj.Name.TextValue.Equals(CurrentTarget, StringComparison.OrdinalIgnoreCase))
-                        continue;
-            
+                    }
+
                     var distance = Vector3.Distance(c.Position, playerPosition);
                     if (distance < bestDistance)
                     {
@@ -277,20 +263,8 @@ namespace ZodiacBuddy
                         if (previousTarget == null || previousTarget.CurrentHp == 0)
                         {
                             Service.PluginLog.Debug($"Previous target {this._currentTargetId} gone or dead. Checking for duplicate registration.");
-            
-                            // if (CurrentTargetId != 0 && !RegisteredKills.Contains(CurrentTargetId))
-                            // {
-                                // RegisteredKills.Add(CurrentTargetId);
-                                // TargetingHelper.RegisterKillIfMatches(CurrentTargetId, CurrentTarget ?? "");
-                            // }
-                            // else
-                            // {
-                                // Service.PluginLog.Debug($"Skipping duplicate or zero-ID kill registration for {CurrentTargetId}.");
-                            // }
                             this._currentTargetId = 0;
                             CurrentTargetPosition = null;
-                            // TargetingHelper.StoredTargetId = 0;
-                            // TargetingHelper.ResetAutoTargetFlag();
                         }
                         else
                         {
@@ -298,34 +272,18 @@ namespace ZodiacBuddy
                         }
                         Service.PluginLog.Debug($"Switching target from {previousId} to {match.GameObjectId}.");
                         this._currentTargetId = match.GameObjectId;
-                        // TargetingHelper.StoredTargetId = match.GameObjectId;
-                        // TargetingHelper.ResetAutoTargetFlag();
                     }
                     if (CurrentTargetPosition == null || Vector3.Distance(CurrentTargetPosition!.Value, match.Position) > 2f)
                     {
                         CurrentTargetPosition = match.Position;
                         StartPathingToCurrentTarget();
                     }
-                    // TargetingHelper.AutoTargetStoredIdIfVisible();
                 }
                 else if (this._currentTargetId != 0 || CurrentTargetPosition != null)
                 {
                     Service.PluginLog.Debug($"Lost sight of {CurrentTarget}, checking for kill...");
-        
-                    // if (this._currentTargetId != 0 && !RegisteredKills.Contains(this._currentTargetId))
-                    // {
-                    //     RegisteredKills.Add(this._currentTargetId);
-                    //     TargetingHelper.RegisterKillIfMatches(this._currentTargetId, CurrentTarget ?? "");
-                    // }
-                    // else
-                    // {
-                    //     Service.PluginLog.Debug($"Skipping duplicate or zero-ID kill registration for {this._currentTargetId}.");
-                    // }
-        
                     this._currentTargetId = 0;
                     CurrentTargetPosition = null;
-                    // TargetingHelper.StoredTargetId = 0;
-                    // TargetingHelper.ResetAutoTargetFlag();
         
                     if (!CompletedObjective)
                         this._pendingPathing = true;
@@ -353,17 +311,26 @@ namespace ZodiacBuddy
 
             ImGui.Separator();
 
-            if (ImGui.Button("Open Book", new Vector2(SizeConstraints?.MinimumSize.X ?? 100, 35)))
-            {
-                if (this.RelicBookGameItem.HasValue)
-                {
-                    UseItem(this.RelicBookGameItem.Value);
-                }
-            }
+            this.UpdateRelicButton();
             
             ImGui.Separator();
 
             UpdateStatusUIOnly();
+        }
+
+        private void UpdateRelicButton()
+        {
+            if (this.RelicBookGameItem.HasValue)
+            {
+                if (ImGui.Button("Open Book", new Vector2(this.SizeConstraints?.MinimumSize.X ?? 100, 35)))
+                {
+                    UseItem(this.RelicBookGameItem.Value);
+                }
+            }
+            else
+            {
+                ImGui.TextDisabled("No Relic Book Found");
+            }
         }
 
         private static unsafe void UseItem(GameInventoryItem gameItem)
@@ -372,9 +339,9 @@ namespace ZodiacBuddy
             if (agentModule == null)
                 return;
 
-            Service.Plugin.PrintMessage($"RowId: {gameItem.ItemId}, " +
-                                        $"ContainerType: {gameItem.ContainerType}, " +
-                                        $"Slot: {gameItem.InventorySlot}");
+            Service.PluginLog.Debug($"RowId: {gameItem.ItemId}, " +
+                                    $"ContainerType: {gameItem.ContainerType}, " +
+                                    $"Slot: {gameItem.InventorySlot}");
             
             agentModule->GetAgentInventoryContext()->UseItem(gameItem.ItemId, 
                 (InventoryType) gameItem.ContainerType, gameItem.InventorySlot);

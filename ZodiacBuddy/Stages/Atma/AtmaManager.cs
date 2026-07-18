@@ -718,7 +718,7 @@ internal partial class AtmaManager : IDisposable {
         
         this._taskManager.Enqueue(() =>
             {
-                if (!_advancedUnstuck.IsRunning)
+                if (!_advancedUnstuck.IsRunning || Service.Plugin.TargetWindow.CompletedObjective)
                     return false;
 
                 VNavmesh.SimpleMove.PathfindAndMoveTo(pFloor, !onMesh);
