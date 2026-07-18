@@ -21,6 +21,8 @@ public class Service {
     
     [PluginService] public static IObjectTable ObjectTable { get; set; }
     [PluginService] public static ITargetManager TargetManager { get; set; }
+    [PluginService] public static IGameInventory GameInventory { get; set; }
+    [PluginService] public static ISigScanner SigScanner { get; private set; }
     public static ZodiacBuddyPlugin Plugin { get; set; } = null!;
     public static PluginConfiguration Configuration { get; set; } = null!;
     public static BonusLightManager BonusLightManager { get; set; } = null!;

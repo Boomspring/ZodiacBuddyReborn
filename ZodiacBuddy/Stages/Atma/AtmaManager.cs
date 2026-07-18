@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Numerics;
 using System.Text;
@@ -30,6 +29,7 @@ using Action = System.Action;
 using FFXVec3 = FFXIVClientStructs.FFXIV.Common.Math.Vector3;
 using RelicNote = FFXIVClientStructs.FFXIV.Client.Game.UI.RelicNote;
 using System.Text.RegularExpressions;
+using Dalamud.Game.Inventory;
 using Dalamud.Game.Text;
 
 namespace ZodiacBuddy.Stages.Atma;
@@ -56,6 +56,18 @@ internal partial class AtmaManager : IDisposable {
     private bool _hasQueuedMountTasks;
     private bool _hasEnteredBetweenAreas;
     private bool _awaitingTeleportFromRelicBookClick;
+    private readonly List<string> _listOfBooks =
+    [
+        "Book of Skyfire I",
+        "Book of Skyfire II",
+        "Book of Netherfire I",
+        "Book of Skyfall I",
+        "Book of Skyfall II",
+        "Book of Netherfall I",
+        "Book of Skywind I",
+        "Book of Skywind II",
+        "Book of Skyearth I"
+    ];
     private enum PathingContext { None, Enemy, Fate, Leve }
     private PathingContext _pathingContext = PathingContext.None;
     private static readonly Dictionary<int, PathingContext> IndexToPathingContext = new()
@@ -128,10 +140,12 @@ internal partial class AtmaManager : IDisposable {
     {
         _advancedUnstuck = new AdvancedUnstuck();
         _advancedUnstuck.OnUnstuckComplete += OnUnstuckCompleteHandler;
+        this.InitializeRelicEventItem();
 
         Service.AddonLifecycle.RegisterListener(AddonEvent.PostReceiveEvent, "RelicNoteBook", ReceiveEventDetour);
         Svc.Framework.Update += _advancedUnstuck.RunningUpdate;
-        Service.ChatGui.ChatMessage += OnChatMessage;
+        Service.ChatGui.ChatMessage += this.OnRelicEnemyKill;
+        Service.ChatGui.ChatMessage += this.OnBookChanged;
     }
     /// <inheritdoc/>
     public void Dispose() {
@@ -139,37 +153,75 @@ internal partial class AtmaManager : IDisposable {
         Svc.Framework.Update -= WaitForBetweenAreasAndExecute;
         Svc.Framework.Update -= MonitorPathingAndDismount;
         Svc.Framework.Update -= _advancedUnstuck.RunningUpdate;
-        Service.ChatGui.ChatMessage -= OnChatMessage;
+        Service.ChatGui.ChatMessage -= this.OnRelicEnemyKill;
+        Service.ChatGui.ChatMessage -= this.OnBookChanged;
         Service.AddonLifecycle.UnregisterListener(ReceiveEventDetour);
         _advancedUnstuck.OnUnstuckComplete -= OnUnstuckCompleteHandler;
         _advancedUnstuck.Dispose();
     }
 
-    private void OnChatMessage(IHandleableChatMessage message)
+    private void OnRelicEnemyKill(IHandleableChatMessage message)
     {
         if (message.LogKind != XivChatType.SystemMessage)
             return;
 
-        var m = MyRegex().Match(message.Message.TextValue);
+        var m = EnemyKillRegex().Match(message.Message.TextValue);
         if (!m.Success)
             return;
         
         foreach (var bookRow in Service.DataManager.GetExcelSheet<Lumina.Excel.Sheets.RelicNote>())
         {
-            if (bookRow.MonsterNoteTargetCommon.TryGetFirst(
-                    mt => string.Equals(m.Groups[1].Value, mt.Value.BNpcName.Value.Singular.ExtractText(), 
-                    StringComparison.OrdinalIgnoreCase), out var monsterTarget))
-            {
-                this._pathingContext = PathingContext.Enemy;
-                this.FlagTargetOnMap(BraveBook.GetMonsterPosition(monsterTarget.RowId));
-                Service.Plugin.TargetWindow.SetTarget(m.Groups[1].Value);
-                Service.Plugin.TargetWindow.KillCount = m.Groups[2].Value;
-                break;
-            }
+            if (!bookRow.MonsterNoteTargetCommon.TryGetFirst(
+                    mt => string.Equals(m.Groups[1].Value, mt.Value.BNpcName.Value.Singular.ExtractText(),
+                        StringComparison.OrdinalIgnoreCase), out var monsterTarget))
+                continue;
+
+            this._pathingContext = PathingContext.Enemy;
+            this.FlagTargetOnMap(BraveBook.GetMonsterPosition(monsterTarget.RowId));
+            Service.Plugin.TargetWindow.SetTarget(m.Groups[1].Value);
+            Service.Plugin.TargetWindow.KillCount = m.Groups[2].Value;
+            break;
         }
 
         if (!Service.Plugin.TargetWindow.CompletedObjective)
             this.RestartNavigationToTarget();
+    }
+    
+    private void InitializeRelicEventItem()
+    {
+        var excelItems = Service.DataManager
+            .GetExcelSheet<EventItem>(language: Dalamud.Game.ClientLanguage.English);
+        
+        // Set the Relic Icon
+        foreach (var i in Service.GameInventory.GetInventoryItems(GameInventoryType.KeyItems))
+        {
+            var excelItem = excelItems
+                .Where(item => this._listOfBooks.Contains(item.Name.ToString()))
+                .FirstOrNull(item => item.RowId == i.BaseItemId);
+
+            if (!excelItem.HasValue)
+                continue;
+
+            Service.Plugin.TargetWindow.RelicBookGameItem = i;
+            Service.Plugin.PrintMessage($"Relic: { excelItem.Value.Name.ToString()} (Loaded)");
+            break;
+        }
+    }
+    
+    private void OnBookChanged(IHandleableChatMessage message)
+    {
+        if (message.LogKind != XivChatType.SystemMessage)
+            return;
+
+        if (BookRemovedRegex().IsMatch(message.Message.TextValue))
+        {
+            Service.Plugin.TargetWindow.RelicBookGameItem = null;
+            Service.Plugin.PrintMessage("Relic Book Removed");
+        }
+        else if (BookAddedRegex().IsMatch(message.Message.TextValue))
+        {
+            this.InitializeRelicEventItem();
+        }
     }
     
     private static uint GetNearestAetheryte(MapLinkPayload mapLink) {
@@ -336,8 +388,8 @@ internal partial class AtmaManager : IDisposable {
         var index = addon->CategoryList->SelectedItemIndex;
 
         // Create lists of each type of target node.
-        List<AddonRelicNoteBook.TargetNode> EnemyTargetNodeList = new()
-        {
+        List<AddonRelicNoteBook.TargetNode> enemyTargetNodeList =
+        [
             addon->Enemy0,
             addon->Enemy1,
             addon->Enemy2,
@@ -348,36 +400,36 @@ internal partial class AtmaManager : IDisposable {
             addon->Enemy7,
             addon->Enemy8,
             addon->Enemy9
-        };
+        ];
         
-        List<AddonRelicNoteBook.TargetNode> DungeonTargetNodeList = new()
-        {
+        List<AddonRelicNoteBook.TargetNode> dungeonTargetNodeList =
+        [
             addon->Dungeon0,
             addon->Dungeon1,
             addon->Dungeon2
-        };
+        ];
         
-        List<AddonRelicNoteBook.TargetNode> FateTargetNodeList = new()
-        {
+        List<AddonRelicNoteBook.TargetNode> fateTargetNodeList =
+        [
             addon->Fate0,
             addon->Fate1,
             addon->Fate2
-        };
+        ];
         
-        List<AddonRelicNoteBook.TargetNode> LeveTargetNodeList = new()
-        {
+        List<AddonRelicNoteBook.TargetNode> leveTargetNodeList =
+        [
             addon->Leve0,
             addon->Leve1,
             addon->Leve2
-        };
+        ];
 
         // Check if the target node is selected.
         var braveBook = BraveBook.GetValue(bookId);
 
-        if (TrySelectTarget(EnemyTargetNodeList, braveBook.Enemies, out var selectedNode, out var selectedTarget)
-            || TrySelectTarget(DungeonTargetNodeList, braveBook.Dungeons, out selectedNode, out selectedTarget)
-            || TrySelectTarget(FateTargetNodeList, braveBook.Fates, out selectedNode, out selectedTarget)
-            || TrySelectTarget(LeveTargetNodeList, braveBook.Leves, out selectedNode, out selectedTarget))
+        if (TrySelectTarget(enemyTargetNodeList, braveBook.Enemies, out var selectedNode, out var selectedTarget)
+            || TrySelectTarget(dungeonTargetNodeList, braveBook.Dungeons, out selectedNode, out selectedTarget)
+            || TrySelectTarget(fateTargetNodeList, braveBook.Fates, out selectedNode, out selectedTarget)
+            || TrySelectTarget(leveTargetNodeList, braveBook.Leves, out selectedNode, out selectedTarget))
         {
         }
         
@@ -911,5 +963,11 @@ internal partial class AtmaManager : IDisposable {
             => target == checkbox->AtkComponentButton.OwnerNode;
     
     [GeneratedRegex(@"^Record of (.+?) kill \((\d+\/\d+)\) added for .*$", RegexOptions.IgnoreCase | RegexOptions.Compiled, "en-GB")]
-    private static partial Regex MyRegex();
+    private static partial Regex EnemyKillRegex();
+    
+    [GeneratedRegex(@"^You have obtained a book from the Trials of the Braves\. The objectives therein can be verified by using the item in the Key Items menu\.$", RegexOptions.IgnoreCase | RegexOptions.Compiled, "en-GB")]
+    private static partial Regex BookAddedRegex();
+    
+    [GeneratedRegex(@"^You throw away a book from the Trials of the Braves\.$", RegexOptions.IgnoreCase | RegexOptions.Compiled, "en-GB")]
+    private static partial Regex BookRemovedRegex();
 }

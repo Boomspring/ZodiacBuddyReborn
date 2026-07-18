@@ -1,9 +1,9 @@
 using Dalamud.Game.ClientState.Conditions;
 using Dalamud.Game.ClientState.Objects.Enums;
 using Dalamud.Game.ClientState.Objects.Types;
+using Dalamud.Game.Inventory;
 using Dalamud.Interface.Windowing;
 using Dalamud.Plugin.Services;
-using ECommons.Automation.LegacyTaskManager;
 using ECommons.DalamudServices;
 using FFXIVClientStructs.FFXIV.Common.Math;
 using Dalamud.Bindings.ImGui;
@@ -12,9 +12,11 @@ using Dalamud.Utility;
 using ZodiacBuddy.Stages.Atma;
 using ECommons.GameHelpers;
 using FFXIVClientStructs.FFXIV.Client.Game;
+using FFXIVClientStructs.FFXIV.Client.System.Framework;
 using FFXIVClientStructs.FFXIV.Client.UI;
 using ZodiacBuddy.SmartCaseUtil;
 using ZodiacBuddy.Stages.Atma.Data;
+using TaskManager = ECommons.Automation.LegacyTaskManager.TaskManager;
 
 namespace ZodiacBuddy
 {
@@ -24,6 +26,7 @@ namespace ZodiacBuddy
         public string? KillCount;
         public bool CompletedObjective => this.KillCount?.StartsWith('3') ?? false;
         public Vector3? CurrentTargetPosition { get; private set; }
+        public GameInventoryItem? RelicBookGameItem { get; set; }
 
         // Ones that already existed
         private readonly TaskManager _taskManager = new();
@@ -331,7 +334,7 @@ namespace ZodiacBuddy
             }
             
             var target = Svc.Targets.Target;
-            if (target != null && target.ObjectKind == ObjectKind.BattleNpc)
+            if (target is { ObjectKind: ObjectKind.BattleNpc })
             {
                 CurrentTarget = SmartCaseHelper.SmartTitleCase(target.Name.TextValue.Trim());
                 this._currentTargetId = target.GameObjectId;
@@ -350,7 +353,31 @@ namespace ZodiacBuddy
 
             ImGui.Separator();
 
+            if (ImGui.Button("Open Book", new Vector2(SizeConstraints?.MinimumSize.X ?? 100, 35)))
+            {
+                if (this.RelicBookGameItem.HasValue)
+                {
+                    UseItem(this.RelicBookGameItem.Value);
+                }
+            }
+            
+            ImGui.Separator();
+
             UpdateStatusUIOnly();
+        }
+
+        private static unsafe void UseItem(GameInventoryItem gameItem)
+        {
+            var agentModule = Framework.Instance()->GetUIModule()->GetAgentModule();
+            if (agentModule == null)
+                return;
+
+            Service.Plugin.PrintMessage($"RowId: {gameItem.ItemId}, " +
+                                        $"ContainerType: {gameItem.ContainerType}, " +
+                                        $"Slot: {gameItem.InventorySlot}");
+            
+            agentModule->GetAgentInventoryContext()->UseItem(gameItem.ItemId, 
+                (InventoryType) gameItem.ContainerType, gameItem.InventorySlot);
         }
 
         private void UpdateStatusUIOnly()
