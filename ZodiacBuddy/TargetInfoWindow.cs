@@ -26,7 +26,7 @@ namespace ZodiacBuddy
         public string? KillCount;
         public bool CompletedObjective => this.KillCount?.StartsWith('3') ?? false;
         public Vector3? CurrentTargetPosition { get; private set; }
-        public GameInventoryItem? RelicBookGameItem { get; set; }
+        public GameInventoryItem? RelicBookGameItem;
 
         // Ones that already existed
         private readonly TaskManager _taskManager = new();

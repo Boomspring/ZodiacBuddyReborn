@@ -56,17 +56,17 @@ internal partial class AtmaManager : IDisposable {
     private bool _hasQueuedMountTasks;
     private bool _hasEnteredBetweenAreas;
     private bool _awaitingTeleportFromRelicBookClick;
-    private readonly List<string> _listOfBooks =
+    private readonly List<uint> _listOfBooks =
     [
-        "Book of Skyfire I",
-        "Book of Skyfire II",
-        "Book of Netherfire I",
-        "Book of Skyfall I",
-        "Book of Skyfall II",
-        "Book of Netherfall I",
-        "Book of Skywind I",
-        "Book of Skywind II",
-        "Book of Skyearth I"
+        2001298, // Book of Skyfire I
+        2001299, // Book of Skyfire II
+        2001300, // Book of Netherfire I
+        2001301, // Book of Skyfall I
+        2001302, // Book of Skyfall II
+        2001303, // Book of Netherfall I
+        2001304, // Book of Skywind I
+        2001305, // Book of Skywind II
+        2001306  // Book of Skyearth I
     ];
     private enum PathingContext { None, Enemy, Fate, Leve }
     private PathingContext _pathingContext = PathingContext.None;
@@ -189,14 +189,12 @@ internal partial class AtmaManager : IDisposable {
     
     private void InitializeRelicEventItem()
     {
-        var excelItems = Service.DataManager
-            .GetExcelSheet<EventItem>(language: Dalamud.Game.ClientLanguage.English);
+        var excelItems = Service.DataManager.GetExcelSheet<EventItem>();
         
-        // Set the Relic Icon
         foreach (var i in Service.GameInventory.GetInventoryItems(GameInventoryType.KeyItems))
         {
             var excelItem = excelItems
-                .Where(item => this._listOfBooks.Contains(item.Name.ToString()))
+                .Where(item => this._listOfBooks.Contains(item.RowId))
                 .FirstOrNull(item => item.RowId == i.BaseItemId);
 
             if (!excelItem.HasValue)
@@ -471,6 +469,9 @@ internal partial class AtmaManager : IDisposable {
         {
             if (this._pathingContext == PathingContext.Fate)
             {
+                // TODO Redesign fate searcher to use existing Fate addon to search Language independent...
+                // English is not the only language!
+                
                 if (FateNameToId.TryGetValue(Normalize(selectedTarget!.Value.Name), out var fateId))
                 {
                     this._pendingFateId = fateId;
