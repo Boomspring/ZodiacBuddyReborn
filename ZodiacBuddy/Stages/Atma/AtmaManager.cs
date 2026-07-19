@@ -99,7 +99,7 @@ internal partial class AtmaManager : IDisposable {
     public bool IsPathing => VNavmesh.Path.IsRunning();
     public bool NavReady => VNavmesh.Nav.IsReady();
     private readonly TaskManager _taskManager = new();
-    private ushort? _pendingFateId;
+    private string? _pendingFateName;
     public bool CanAct
     {
         get
@@ -328,7 +328,7 @@ internal partial class AtmaManager : IDisposable {
         this._hasEnteredBetweenAreas = false;
         this._hasQueuedMountTasks = false;
         this._awaitingTeleportFromRelicBookClick = false;
-        this._pendingFateId = null;
+        this._pendingFateName = null;
     }
     private void ResetTeleportCycleFlags()
     {
@@ -519,17 +519,7 @@ internal partial class AtmaManager : IDisposable {
         {
             if (this._pathingContext == PathingContext.Fate)
             {
-                // TODO Redesign fate searcher to use existing Fate addon to search Language independent...
-                // English is not the only language!
-                
-                if (FateNameToId.TryGetValue(Normalize(selectedTarget!.Value.Name), out var fateId))
-                {
-                    this._pendingFateId = fateId;
-                    Service.PluginLog.Debug(
-                        $"[ZBR] Pending FateId set to {this._pendingFateId.Value} for '{selectedTarget?.Name}'.");
-                }
-                else Service.PluginLog.Warning(
-                    $"[ZBR] Unknown FATE name '{selectedTarget?.Name}' - cannot resolve FateId.");
+                this._pendingFateName = selectedTarget!.Value.Name;
             }
                 
             Service.Plugin.TargetWindow.SetTarget(selectedTarget!.Value.Name);
@@ -544,10 +534,11 @@ internal partial class AtmaManager : IDisposable {
             // Same zone (or teleport disabled): skip teleport and only start vnavmesh.
             if (Service.Configuration.DisableTeleport || Svc.ClientState.TerritoryType == destinationPos.TerritoryType.RowId)
             {
+                IFate fatePos = null!;
                 if (this._pathingContext != PathingContext.Fate ||
-                    (_pendingFateId is { } wantId && TryGetLiveFateById(wantId, out _)))
+                    TryGetLiveFateById(this._pendingFateName, out fatePos))
                 { 
-                    EnqueueMountUp(); // this uses /vnav flyflag, same as the teleport flow
+                    EnqueueMountUp(fatePos.Position); // this uses /vnav flyflag, same as the teleport flow
                 } 
                 return;
             }
@@ -629,17 +620,19 @@ internal partial class AtmaManager : IDisposable {
         }
     }
 
-    private static bool TryGetLiveFateById(ushort fateId, out IFate fate)
+    private static bool TryGetLiveFateById(string? selectedTarget, out IFate fate)
     {
         foreach (var f in Svc.Fates)
         {
-            if (f.FateId != fateId)
+            if (f.Name.ToString() != selectedTarget)
                 continue;
 
             fate = f;
+            Service.Plugin.PrintMessage($"Fate '{selectedTarget}' is up. Proceeding.");
             return true;
         }
         fate = null!;
+        Service.Plugin.PrintMessage($"Fate '{selectedTarget}' is not live yet. Please wait and try again.");
         return false;
     }
     private void MonitorUnstuck(IFramework _)
@@ -712,27 +705,16 @@ internal partial class AtmaManager : IDisposable {
 
         if (_pathingContext == PathingContext.Fate)
         {
-            if (_pendingFateId is { } wantId)
+            Service.PluginLog.Debug($"[ZodiacBuddy] Post-teleport check for Fate (queued={this._hasQueuedMountTasks}).");
+
+            if (TryGetLiveFateById(this._pendingFateName, out var liveFate))
             {
-                Service.PluginLog.Debug($"[ZBR] Post-teleport check for FateId={wantId} (queued={this._hasQueuedMountTasks}).");
-
-                if (TryGetLiveFateById(wantId, out var liveFate))
-                {
-                    Service.PluginLog.Debug($"[ZBR] FateId={wantId} is present and active. Moving.");
-                    EnqueueMountAndFlyTo(liveFate.Position);
-
-                    this._hasQueuedMountTasks = true;
-                }
-                else
-                {
-                    Service.PluginLog.Debug("[ZBR] Clicked FATE id not present/active. Holding at aetheryte.");
-                    this._hasQueuedMountTasks = true; 
-                }
+                Service.PluginLog.Debug($"[ZodiacBuddy] FateId={liveFate.FateId} is present and active. Moving.");
+                this.EnqueueMountUp(liveFate.Position);
             }
             else
             {
-                Service.PluginLog.Warning("[ZBR] No pending FATE id set. Holding at aetheryte.");
-                this._hasQueuedMountTasks = true;
+                Service.PluginLog.Debug("[ZodiacBuddy] Clicked FATE not present/active. Holding at aetheryte.");
             }
         }
         else
@@ -742,41 +724,15 @@ internal partial class AtmaManager : IDisposable {
         this._awaitingTeleportFromRelicBookClick = false;
         Svc.Framework.Update -= WaitForBetweenAreasAndExecute;
     }
-    private void EnqueueMountAndFlyTo(Vector3 dest)
+    private unsafe void EnqueueMountUp(Vector3? dest = null)
     {
-        var pFloor = VNavmesh.Query.Mesh.PointOnFloor(dest, true, 1.0f);
+        var pFloor = dest.HasValue ? VNavmesh.Query.Mesh.PointOnFloor(dest.Value, true, 1.0f) : Player.Position;
         var onMesh = VNavmesh.Query.Mesh.IsPointOnMesh(
             pFloor,
             0.5f,
             false
         );
         
-        this._taskManager.Enqueue(() => NavReady, "NavReady");
-        if (!onMesh)
-        {
-            this._taskManager.Enqueue(() => Mount, "Mount");
-            this._taskManager.Enqueue(() => _advancedUnstuck.IsRunning || Svc.Condition[ConditionFlag.Mounted]);
-            this._taskManager.Enqueue(() =>
-            {
-                // Extra delay after teleport to avoid racing the client state
-                this._taskManager.DelayNextImmediate(PostTeleportVnavDelayMs);
-                // If mount dropped during the delay, keep waiting
-                return Svc.Condition[ConditionFlag.Mounted] || _advancedUnstuck.IsRunning;
-            });
-        }
-        
-        this._taskManager.Enqueue(() =>
-            {
-                if (!_advancedUnstuck.IsRunning || Service.Plugin.TargetWindow.CompletedObjective)
-                    return false;
-
-                VNavmesh.SimpleMove.PathfindAndMoveTo(pFloor, !onMesh);
-                EnqueueUnmountAfterNav();
-                return true;
-        });
-    }
-    private unsafe void EnqueueMountUp()
-    {
         this._taskManager.Enqueue(() => NavReady);
 
         // Dont skip mounting
@@ -828,7 +784,14 @@ internal partial class AtmaManager : IDisposable {
             if (!_advancedUnstuck.IsRunning && !Svc.Condition[ConditionFlag.Mounted])
                 return false;
 
-            Chat.ExecuteCommand("/vnav flyflag");
+            if (dest.HasValue)
+            {
+                VNavmesh.SimpleMove.PathfindAndMoveTo(pFloor, !onMesh);
+            }
+            else
+            {
+                Chat.ExecuteCommand("/vnav flyflag");
+            }
             EnqueueUnmountAfterNav();
             this._hasEnteredBetweenAreas = false;
             this._awaitingTeleportFromRelicBookClick = false;
@@ -922,19 +885,19 @@ internal partial class AtmaManager : IDisposable {
                 {
                     if (Service.Plugin.TargetWindow.CurrentTargetPosition is { } ffxPos)
                     {
-                        EnqueueMountAndFlyTo(ffxPos);
+                        EnqueueMountUp(ffxPos);
                     }
                     else
                     {
-                        Service.PluginLog.Debug("[ZodiacBuddy] Restart nav (Enemy): no TargetWindow pos; using /vnav flyflag.");
+                        Service.PluginLog.Debug("[ZodiacBuddy] Restart nav (Enemy): no TargetWindow pos; using /vnav moveflag.");
                         Chat.ExecuteCommand("/vnav moveflag");
                     }
                 }
                 break;
             case PathingContext.Fate:
-                if (_pendingFateId is { } wantId && TryGetLiveFateById(wantId, out var liveFate))
+                if (TryGetLiveFateById(this._pendingFateName, out var liveFate))
                 {
-                    EnqueueMountAndFlyTo(liveFate.Position);
+                    EnqueueMountUp(liveFate.Position);
                 }
                 break;
 

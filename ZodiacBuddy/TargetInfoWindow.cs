@@ -127,7 +127,10 @@ namespace ZodiacBuddy
                 
                 if (this._pendingPathing && !VNavmesh.Path.IsRunning() && (DateTime.Now - this._lastPathingTime).TotalSeconds > 2)
                 {
-                    StartPathingToCurrentTarget();
+                    if (State == TargetingState.Idle)
+                    {
+                        StartPathingToCurrentTarget();
+                    }
 
                     this._taskManager.Enqueue(() => AtmaManager.Dismount, "Dismount");
                     
