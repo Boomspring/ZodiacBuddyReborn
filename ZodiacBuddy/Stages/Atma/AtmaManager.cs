@@ -68,6 +68,20 @@ internal partial class AtmaManager : IDisposable {
         2001305, // Book of Skywind II
         2001306  // Book of Skyearth I
     ];
+    private readonly List<uint> _listOfRelics =
+    [
+        7824, // Curtana Atma
+        7825, // Sphairai Atma
+        7826, // Bravura Atma
+        7827, // Gae Bolg Atma
+        7828, // Artemis Bow
+        7829, // Thyrus Atma
+        7830, // Stardust Rod Atma
+        7831, // The Veil of Wiyu Atma
+        7832, // Omnilex Atma
+        7833, // Holy Shield Atma
+        9251, // Yoshimitsu Atma
+    ];
     private enum PathingContext { None, Enemy, Fate, Leve }
     private PathingContext _pathingContext = PathingContext.None;
     private static readonly Dictionary<int, PathingContext> IndexToPathingContext = new()
@@ -372,7 +386,7 @@ internal partial class AtmaManager : IDisposable {
     {
         if (!Service.Configuration.IsAtmaManagerEnabled)
         {
-            Service.Plugin.PrintMessage("Atma Manager is disabled.");
+            Service.ChatGui.PrintError("[ZodiacBuddy] Atma Manager is disabled.");
             return;
         }
         
@@ -385,6 +399,20 @@ internal partial class AtmaManager : IDisposable {
         var bookId = relicNote->RelicNoteId;
         var index = addon->CategoryList->SelectedItemIndex;
 
+        // Check if the target node is selected.
+        var braveBook = BraveBook.GetValue(bookId);
+        
+        if (Service.Configuration.EnableOnlyWhenRelicEquipped)
+        {
+            var relicId = this._listOfRelics.ElementAtOrDefault(relicNote->RelicId - 1);
+            if (Util.GetEquippedItem(0).ItemId != relicId && 
+                Util.GetEquippedItem(1).ItemId != relicId)
+            {
+                Service.ChatGui.PrintError("[ZodiacBuddy] Disabled until you have the correct relic equipped.");
+                return;
+            }
+        }
+        
         // Create lists of each type of target node.
         List<AddonRelicNoteBook.TargetNode> enemyTargetNodeList =
         [
@@ -400,6 +428,13 @@ internal partial class AtmaManager : IDisposable {
             addon->Enemy9
         ];
         
+        if (TrySelectTarget(enemyTargetNodeList, braveBook.Enemies, out var selectedNode, out var selectedTarget) && 
+            relicNote->GetMonsterProgress(enemyTargetNodeList.IndexOf(selectedNode!.Value)) == 3)
+        {
+            Service.ChatGui.PrintError("[ZodiacBuddy] You have already completed the required number of enemy kills.");
+            return;
+        }
+
         List<AddonRelicNoteBook.TargetNode> dungeonTargetNodeList =
         [
             addon->Dungeon0,
@@ -407,12 +442,28 @@ internal partial class AtmaManager : IDisposable {
             addon->Dungeon2
         ];
         
+        if (!selectedTarget.HasValue && !selectedTarget.HasValue &&
+            TrySelectTarget(dungeonTargetNodeList, braveBook.Dungeons, out selectedNode, out selectedTarget) &&
+            relicNote->IsDungeonComplete(dungeonTargetNodeList.IndexOf(selectedNode!.Value)))
+        {
+            Service.ChatGui.PrintError("[ZodiacBuddy] You have already completed this dungeon.");
+            return;
+        }
+
         List<AddonRelicNoteBook.TargetNode> fateTargetNodeList =
         [
             addon->Fate0,
             addon->Fate1,
             addon->Fate2
         ];
+        
+        if (!selectedTarget.HasValue && !selectedTarget.HasValue &&
+            TrySelectTarget(fateTargetNodeList, braveBook.Fates, out selectedNode, out selectedTarget)
+            && relicNote->IsFateComplete(fateTargetNodeList.IndexOf(selectedNode!.Value)))
+        {
+            Service.ChatGui.PrintError("[ZodiacBuddy] You have already completed this FATE.");
+            return;
+        }
         
         List<AddonRelicNoteBook.TargetNode> leveTargetNodeList =
         [
@@ -421,21 +472,21 @@ internal partial class AtmaManager : IDisposable {
             addon->Leve2
         ];
 
-        // Check if the target node is selected.
-        var braveBook = BraveBook.GetValue(bookId);
-
-        if (TrySelectTarget(enemyTargetNodeList, braveBook.Enemies, out var selectedNode, out var selectedTarget)
-            || TrySelectTarget(dungeonTargetNodeList, braveBook.Dungeons, out selectedNode, out selectedTarget)
-            || TrySelectTarget(fateTargetNodeList, braveBook.Fates, out selectedNode, out selectedTarget)
-            || TrySelectTarget(leveTargetNodeList, braveBook.Leves, out selectedNode, out selectedTarget))
+        if (!selectedTarget.HasValue && !selectedTarget.HasValue &&
+            TrySelectTarget(leveTargetNodeList, braveBook.Leves, out selectedNode, out selectedTarget) 
+            && relicNote->IsLeveComplete(leveTargetNodeList.IndexOf(selectedNode!.Value)))
         {
+            Service.ChatGui.PrintError("[ZodiacBuddy] You have already completed this leve.");
+            return;
         }
+
+        if (!selectedTarget.HasValue || !selectedNode.HasValue)
+            return;
+        
+        Service.Plugin.TargetWindow.SetTargetNode(selectedNode.Value, selectedTarget.Value);
         
         this.ResetRunStateForNewCycle();
         IndexToPathingContext.TryGetValue(index, out _pathingContext);
-
-        if (selectedTarget == null || selectedNode == null || Service.Plugin.TargetWindow.CompletedObjective)
-            return;
 
         var destinationPos = selectedTarget.Value.Position;
         this.FlagTargetOnMap(destinationPos);
@@ -462,7 +513,6 @@ internal partial class AtmaManager : IDisposable {
         {
             Service.Plugin.PrintMessage($"Copied {selectedTarget?.Name} to clipboard.");
             ImGui.SetClipboardText(selectedTarget?.Name);
-
         }
 
         if (index != 1)
@@ -556,7 +606,6 @@ internal partial class AtmaManager : IDisposable {
 
                 matchedNode = node;
                 matchedTarget = targets[targetIndex];
-                Service.Plugin.TargetWindow.SetTargetNode(matchedNode.Value, matchedTarget.Value);
                 return true;
             }
 
@@ -831,7 +880,7 @@ internal partial class AtmaManager : IDisposable {
                 if (_pathingContext == PathingContext.Enemy)
                 {
                     Service.Plugin.TargetWindow.OnAtmaPathingComplete();
-                    this._taskManager.Enqueue(() => { this._taskManager.DelayNextImmediate(750); return true; });
+                    this._taskManager.Enqueue(() => { this._taskManager.DelayNextImmediate(PostTeleportVnavDelayMs); return true; });
                     this._taskManager.Enqueue(() =>
                     {
                         if (VNavmesh.Nav.PathfindInProgress() || VNavmesh.Path.IsRunning())

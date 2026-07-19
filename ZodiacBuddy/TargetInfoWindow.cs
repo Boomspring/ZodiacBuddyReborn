@@ -8,6 +8,7 @@ using ECommons.DalamudServices;
 using FFXIVClientStructs.FFXIV.Common.Math;
 using Dalamud.Bindings.ImGui;
 using System;
+using System.Linq;
 using Dalamud.Utility;
 using ZodiacBuddy.Stages.Atma;
 using ECommons.GameHelpers;
@@ -17,6 +18,7 @@ using FFXIVClientStructs.FFXIV.Client.UI;
 using ZodiacBuddy.SmartCaseUtil;
 using ZodiacBuddy.Stages.Atma.Data;
 using TaskManager = ECommons.Automation.LegacyTaskManager.TaskManager;
+using Lumina.Excel.Sheets;
 
 namespace ZodiacBuddy
 {
@@ -302,10 +304,19 @@ namespace ZodiacBuddy
 
         public override void Draw()
         {
+            if (!Svc.ClientState.IsLoggedIn || Svc.Condition[ConditionFlag.BetweenAreas]) return;
+            
             var atmaEnabled = Service.Configuration.IsAtmaManagerEnabled;
             if (ImGui.Checkbox("Enable Atma Manager", ref atmaEnabled))
             {
                 Service.Configuration.IsAtmaManagerEnabled = atmaEnabled;
+                Service.Configuration.Save();
+            }
+
+            var enabledOnlyRelicEquipped = Service.Configuration.EnableOnlyWhenRelicEquipped;
+            if (ImGui.Checkbox("Enable When Relic Equipped", ref enabledOnlyRelicEquipped))
+            {
+                Service.Configuration.EnableOnlyWhenRelicEquipped = enabledOnlyRelicEquipped;
                 Service.Configuration.Save();
             }
 
@@ -320,6 +331,7 @@ namespace ZodiacBuddy
 
         private void UpdateRelicButton()
         {
+            // Temporary Code
             if (this.RelicBookGameItem.HasValue)
             {
                 if (ImGui.Button("Open Book", new Vector2(this.SizeConstraints?.MinimumSize.X ?? 100, 35)))
@@ -351,16 +363,16 @@ namespace ZodiacBuddy
         {
             ImGui.Text(this.CurrentTarget.IsNullOrEmpty() ? "No target selected." : $"Target: {this.CurrentTarget}");
 
-            if (this.KillCount.IsNullOrEmpty())
-                return;
-
-            if (CompletedObjective)
+            if (!this.KillCount.IsNullOrEmpty())
             {
-                ImGui.TextColored(new Vector4(0f, 1f, 0f, 1f), "Kill Target Complete!");
-            }
-            else
-            {
-                ImGui.TextColored(new Vector4(1f, 1f, 1f, 1f), $"Kills: {this.KillCount}");
+                if (CompletedObjective)
+                {
+                    ImGui.TextColored(new Vector4(0f, 1f, 0f, 1f), "Kill Target Complete!");
+                }
+                else
+                {
+                    ImGui.TextColored(new Vector4(1f, 1f, 1f, 1f), $"Kills: {this.KillCount}");
+                }
             }
             
             ImGui.Separator();

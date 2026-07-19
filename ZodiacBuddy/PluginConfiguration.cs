@@ -19,7 +19,10 @@ public class PluginConfiguration : IPluginConfiguration {
     public bool BraveCopyTarget { get; set; } = true;
 
     [JsonPropertyName("IsAtmaManagerEnabled")]
-    public bool IsAtmaManagerEnabled { get; set; }
+    public bool IsAtmaManagerEnabled { get; set; } = true;
+
+    [JsonPropertyName("EnableOnlyWhenRelicEquipped")]
+    public bool EnableOnlyWhenRelicEquipped { get; set; } = true;
     
     public BonusLightConfiguration BonusLight { get; } = new();
 
