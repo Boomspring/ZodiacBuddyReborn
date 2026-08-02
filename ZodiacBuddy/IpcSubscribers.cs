@@ -6,27 +6,52 @@ using System.Diagnostics;
 using System.Numerics;
 using System.Threading;
 using System.Threading.Tasks;
-using Dalamud.Plugin.Ipc;
-using Dalamud.Plugin.Ipc.Exceptions;
 
-#pragma warning disable CS0649 // Field is never assigned to, and will always have its default value
 namespace ZodiacBuddy;
 
-internal static class IPCSubscriber
+internal static class IpcSubscriber
 {
     public static bool IsReady(string pluginName)
         => DalamudReflector.TryGetDalamudPlugin(pluginName, out _, false, true);
 }
 
-internal static class AutoDutyIpc
+internal static class AutoDuty
 {
-    private static ICallGateSubscriber<uint, bool>? _contentHasPath;     // "AutoDuty.ContentHasPath" (territoryId -> hasPath)
-    private static ICallGateSubscriber<string, string, object>? _setConfig; // "AutoDuty.SetConfig" (key,value)
-    private static ICallGateSubscriber<uint, int, bool, object>? _run;      // "AutoDuty.Run" (territoryId, pathIndex, useBareMode)
-    private static ICallGateSubscriber<bool>? _isStopped;                 // "AutoDuty.IsStopped"
-    private static ICallGateSubscriber<object>? _stop;                    // "AutoDuty.Stop"
+    public static bool Enabled 
+        => IpcSubscriber.IsReady("AutoDuty");
 
-    public static bool Enabled { get; private set; }
+    static AutoDuty()
+    {
+        EzIPC.Init(typeof(AutoDuty), "AutoDuty");
+        Debug.Assert(ContentHasPath != null);
+        Debug.Assert(SetConfig != null);
+        Debug.Assert(Run != null);
+        Debug.Assert(Stop != null);
+        Debug.Assert(IsStopped != null);
+        Debug.Assert(IsNavigating != null);
+        Debug.Assert(IsLooping != null);
+    }
+    
+    [EzIPC("AutoDuty.ContentHasPath", applyPrefix: false)]
+    internal static readonly Func<uint, bool> ContentHasPath;
+    
+    [EzIPC("AutoDuty.SetConfig", applyPrefix: false)]
+    internal static readonly Action<string, string> SetConfig;
+    
+    [EzIPC("AutoDuty.Run", applyPrefix: false)]
+    internal static readonly Action<uint, int, bool> Run;
+    
+    [EzIPC("AutoDuty.Run", applyPrefix: false)]
+    internal static readonly Action Stop;
+    
+    [EzIPC("AutoDuty.IsStopped", applyPrefix: false)]
+    internal static readonly Func<bool> IsStopped;
+    
+    [EzIPC("AutoDuty.IsNavigating", applyPrefix: false)]
+    internal static readonly Func<bool> IsNavigating;
+    
+    [EzIPC("AutoDuty.IsLooping", applyPrefix: false)]
+    internal static readonly Func<bool> IsLooping;
 
     public enum DutyMode
     {
@@ -34,72 +59,30 @@ internal static class AutoDutyIpc
         UnsyncRegular = 2,
     }
 
-    public static void Init()
-    {
-        try
-        {
-            _contentHasPath = Service.Interface.GetIpcSubscriber<uint, bool>("AutoDuty.ContentHasPath");
-            _setConfig = Service.Interface.GetIpcSubscriber<string, string, object>("AutoDuty.SetConfig");
-            _run = Service.Interface.GetIpcSubscriber<uint, int, bool, object>("AutoDuty.Run");
-            _isStopped = Service.Interface.GetIpcSubscriber<bool>("AutoDuty.IsStopped");
-            _stop = Service.Interface.GetIpcSubscriber<object>("AutoDuty.Stop");
-            Enabled = true;
-        }
-        catch
-        {
-            Enabled = false;
-        }
-    }
-
-    public static bool HasPath(uint territoryId)
-    {
-        try { return _contentHasPath?.InvokeFunc(territoryId) ?? false; }
-        catch (IpcError) { return false; }
-    }
-
-    public static bool IsStopped()
-    {
-        try { return _isStopped?.InvokeFunc() ?? true; }
-        catch (IpcError) { return true; }
-    }
-
-    public static void Stop()
-    {
-        try { _stop?.InvokeAction(); } catch (IpcError) { /* swallow */ }
-    }
-
     /// <summary>
     /// Configure AutoDuty for Unsynced/Support and start the run.
     /// </summary>
-    public static bool StartInstance(uint territoryId, DutyMode dutyMode, bool useBareMode = true)
+    public static bool StartInstance(
+        uint territoryId, DutyMode dutyMode = DutyMode.UnsyncRegular, bool useBareMode = true)
     {
-        if (!Enabled || _setConfig is null || _run is null) return false;
+        if (!Enabled) return false;
 
-        try
-        {
-            // Mirror Questionable config:
-            // Unsynced: true for UnsyncRegular, false for Support
-            _setConfig.InvokeAction("Unsynced", (dutyMode == DutyMode.UnsyncRegular).ToString());
+        // Unsynced: true for UnsyncRegular, false for Support
+        SetConfig.Invoke("Unsynced", (dutyMode == DutyMode.UnsyncRegular).ToString());
 
-            // dutyModeEnum: "Regular" for UnsyncRegular, "Support" otherwise
-            var modeStr = dutyMode == DutyMode.UnsyncRegular ? "Regular" : "Support";
-            _setConfig.InvokeAction("dutyModeEnum", modeStr);
+        // dutyModeEnum: "Regular" for UnsyncRegular, "Support" otherwise
+        var modeStr = dutyMode == DutyMode.UnsyncRegular ? "Regular" : "Support";
+        SetConfig.Invoke("dutyModeEnum", modeStr);
 
-            // Path index: 1 (same as Questionable); useBareMode: true by default
-            _run.InvokeAction(territoryId, 1, useBareMode);
-            return true;
-        }
-        catch (IpcError)
-        {
-            return false;
-        }
+        Run.Invoke(territoryId, 0, useBareMode);
+        return true;
     }
 }
 
 internal static class VNavmesh
 {
     internal static bool Enabled
-        => IPCSubscriber.IsReady("vnavmesh");
+        => IpcSubscriber.IsReady("vnavmesh");
 
     internal static class Nav
     {
@@ -163,6 +146,7 @@ internal static class VNavmesh
                 Debug.Assert(NearestPoint != null);
                 Debug.Assert(PointOnFloor != null);
                 Debug.Assert(IsPointOnMesh != null);
+                Debug.Assert(FlagToPoint != null);
             }
 
             [EzIPC("vnavmesh.Query.Mesh.NearestPoint", applyPrefix: false)]
@@ -173,6 +157,9 @@ internal static class VNavmesh
             
             [EzIPC("vnavmesh.Query.Mesh.IsPointOnMesh", applyPrefix: false)]
             internal static readonly Func<Vector3, float, bool, bool> IsPointOnMesh;
+            
+            [EzIPC("vnavmesh.Query.Mesh.FlagToPoint", applyPrefix: false)]
+            internal static readonly Func<Vector3> FlagToPoint;
         }
     }
 

@@ -1,6 +1,6 @@
 using Dalamud.Game.Text.SeStringHandling.Payloads;
 
-namespace ZodiacBuddy.Stages.Atma.Data;
+namespace ZodiacBuddy.Stages.Atma;
 
 /// <summary>
 /// A single target for a Trial of the Braves book.

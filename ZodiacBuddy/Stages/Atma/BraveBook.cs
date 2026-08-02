@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using Dalamud.Game.Text.SeStringHandling.Payloads;
 using Lumina.Excel.Sheets;
 
-namespace ZodiacBuddy.Stages.Atma.Data;
+namespace ZodiacBuddy.Stages.Atma;
 
 /// <summary>
 /// A collection of targets for a single Trial of the Braves book.
@@ -166,7 +166,7 @@ internal struct BraveBook {
             357 => new MapLinkPayload( 156,  25, 17.0f, 16.0f), // daring harrier          // Mor Dhona
             358 => new MapLinkPayload( 155,  53, 13.7f, 27.7f), // giant logger            // Coerthas Central Highlands
             359 => new MapLinkPayload( 138,  18, 17.3f, 16.8f), // shoalspine Sahagin      // Western La Noscea
-            360 => new MapLinkPayload( 156,  25, 10.6f, 14.8f), // 5th Cohort vanguard     // Mor Dhona
+            360 => new MapLinkPayload( 156,  25, 11.0f, 15.1f), // 5th Cohort vanguard     // Mor Dhona
             361 => new MapLinkPayload( 180,  30, 24.6f,  7.3f), // synthetic doblyn        // Outer La Noscea
             362 => new MapLinkPayload( 140,  20, 12.3f,  6.9f), // 4th Cohort hoplomachus  // Western Thanalan
             363 => new MapLinkPayload( 146,  23, 18.2f, 24.6f), // Zanr'ak pugilist        // Southern Thanalan
@@ -192,7 +192,7 @@ internal struct BraveBook {
             383 => new MapLinkPayload( 138,  18, 13.8f, 17.2f), // shelfclaw Reaver        // Western La Noscea
             384 => new MapLinkPayload( 146,  23, 31.8f, 18.8f), // Zahar'ak fortune-teller  // Southern Thanalan
             385 => new MapLinkPayload( 137,  17, 29.5f, 20.8f), // 2nd Cohort laquearius   // Eastern La Noscea
-            386 => new MapLinkPayload( 138,  18, 17.8f, 19.9f), // shelfscale Sahagin      // Western La Noscea
+            386 => new MapLinkPayload( 138,  18, 17.8f, 19.8f), // shelfscale Sahagin      // Western La Noscea
             387 => new MapLinkPayload( 156,  25, 13.1f, 10.7f), // mudpuppy                // Mor Dhona
             388 => new MapLinkPayload( 146,  23, 18.1f, 21.0f), // Amalj'aa lancer         // Southern Thanalan
             389 => new MapLinkPayload( 156,  25, 25.6f, 12.5f), // lake cobra              // Mor Dhona
@@ -204,7 +204,7 @@ internal struct BraveBook {
             395 => new MapLinkPayload( 137,  17, 29.5f, 20.8f), // 2nd Cohort eques        // Eastern La Noscea
             396 => new MapLinkPayload( 152,   5, 28.2f, 12.9f), // sylpheed sigh           // East Shroud
             397 => new MapLinkPayload( 146,  23, 16.2f, 25.0f), // iron tortoise           // Southern Thanalan
-            398 => new MapLinkPayload( 156,  25, 10.6f, 14.8f), // 5th Cohort hoplomachus  // Mor Dhona
+            398 => new MapLinkPayload( 156,  25, 11.0f, 15.1f), // 5th Cohort hoplomachus  // Mor Dhona
             399 => new MapLinkPayload( 155,  53, 16.2f, 31.6f), // snow wolf               // Coerthas Central Highlands
             400 => new MapLinkPayload( 153,   6, 32.6f, 23.7f), // ked                     // South Shroud
             401 => new MapLinkPayload( 180,  30, 24.6f,  7.3f), // U'Ghamaro bedesman      // Outer La Noscea
@@ -214,7 +214,7 @@ internal struct BraveBook {
             405 => new MapLinkPayload( 138,  18, 14.3f, 14.4f), // Sapsa shelfscale        // Western La Noscea
             406 => new MapLinkPayload( 146,  23, 20.7f, 21.3f), // Amalj'aa brigand        // Southern Thanalan
             407 => new MapLinkPayload( 153,   6, 30.4f, 25.1f), // lesser kalong           // South Shroud
-            408 => new MapLinkPayload( 156,  25, 10.6f, 14.8f), // 5th Cohort laquearius   // Mor Dhona
+            408 => new MapLinkPayload( 156,  25, 11.0f, 15.1f), // 5th Cohort laquearius   // Mor Dhona
             409 => new MapLinkPayload( 156,  25, 30.0f, 14.7f), // gigas sozu              // Mor Dhona
             410 => new MapLinkPayload( 154,   7, 20.0f, 20.0f), // Ixali windtalon         // North Shroud
             411 => new MapLinkPayload( 180,  30, 24.6f,  7.3f), // U'Ghamaro priest        // Outer La Noscea
@@ -224,26 +224,26 @@ internal struct BraveBook {
             415 => new MapLinkPayload( 138,  18, 14.3f, 14.4f), // Sapsa shelfclaw         // Western La Noscea
             416 => new MapLinkPayload( 152,   5, 28.2f, 12.9f), // sylpheed snarl          // East Shroud
             417 => new MapLinkPayload( 146,  23, 20.2f, 20.8f), // Amalj'aa thaumaturge    // Southern Thanalan
-            418 => new MapLinkPayload( 156,  25, 10.6f, 14.8f), // 5th Cohort eques        // Mor Dhona
+            418 => new MapLinkPayload( 156,  25, 11.0f, 15.1f), // 5th Cohort eques        // Mor Dhona
             419 => new MapLinkPayload( 138,  18, 17.4f, 15.9f), // Sapsa elbst             // Western La Noscea
             420 => new MapLinkPayload( 156,  25, 27.0f,  8.0f), // hippogryph              // Mor Dhona
             421 => new MapLinkPayload( 138,  18, 20.0f, 19.5f), // trenchtooth Sahagin     // Western La Noscea
             422 => new MapLinkPayload( 155,  53, 34.5f, 22.1f), // Natalan windtalon       // Coerthas Central Highlands
             423 => new MapLinkPayload( 180,  30, 24.6f,  7.3f), // elite roundsman         // Outer La Noscea
             424 => new MapLinkPayload( 147,  24, 24.5f, 21.3f), // ahriman                 // Northern Thanalan
-            427 => new MapLinkPayload( 156,  25, 10.6f, 14.8f), // 5th Cohort signifer     // Mor Dhona
+            427 => new MapLinkPayload( 156,  25, 11.0f, 15.1f), // 5th Cohort signifer     // Mor Dhona
             425 => new MapLinkPayload( 137,  17, 29.5f, 20.8f), // 2nd Cohort secutor      // Eastern La Noscea
             426 => new MapLinkPayload( 156,  25, 30.0f, 14.7f), // gigas shramana          // Mor Dhona
             428 => new MapLinkPayload( 152,   5, 27.5f, 18.3f), // dreamtoad               // East Shroud
             429 => new MapLinkPayload( 154,   7, 19.2f, 19.8f), // watchwolf               // North Shroud
-            430 => new MapLinkPayload( 146,  23, 20.6f, 23.6f), // Amalj'aa archer         // Southern Thanalan
+            430 => new MapLinkPayload( 146,  23, 20.8f, 23.7f), // Amalj'aa archer         // Southern Thanalan
             431 => new MapLinkPayload( 140,  20, 12.2f,  6.9f), // 4th Cohort signifer     // Western Thanalan
             432 => new MapLinkPayload( 146,  23, 31.8f, 18.8f), // Zahar'ak battle drake   // Southern Thanalan
             433 => new MapLinkPayload( 138,  18, 14.3f, 14.4f), // Sapsa shelftooth        // Western La Noscea
             434 => new MapLinkPayload( 155,  53, 34.5f, 22.1f), // Natalan fogcaller       // Coerthas Central Highlands
             435 => new MapLinkPayload( 180,  30, 24.6f,  7.3f), // elite priest            // Outer La Noscea
             436 => new MapLinkPayload( 146,  23, 19.4f, 21.0f), // Amalj'aa scavenger      // Southern Thanalan
-            437 => new MapLinkPayload( 156,  25, 10.6f, 14.8f), // 5th Cohort secutor      // Mor Dhona
+            437 => new MapLinkPayload( 156,  25, 11.0f, 15.1f), // 5th Cohort secutor      // Mor Dhona
             438 => new MapLinkPayload( 154,   7, 19.2f, 19.8f), // Ixali boldwing          // North Shroud
             439 => new MapLinkPayload( 146,  23, 26.0f, 21.2f), // Zahar'ak pugilist       // Southern Thanalan
             440 => new MapLinkPayload( 138,  18, 13.9f, 15.5f), // axolotl                 // Western La Noscea
@@ -262,14 +262,14 @@ internal struct BraveBook {
             453 => new MapLinkPayload( 350, 138, 11.2f, 11.3f), // Halicarnassus           // Haukke Manor (Hard)
             454 => new MapLinkPayload( 360, 145,  6.1f, 11.6f), // Mumuepo the Beholden    // Halatali (Hard)
             455 => new MapLinkPayload(1038,  41,  9.2f, 11.3f), // Gyges the Great         // Copperbell Mines
-            456 => new MapLinkPayload( 171,  86, 12.8f,  7.8f), // Batraal                 // Dzemael Darkhold
+            456 => new MapLinkPayload( 1330,  86, 12.8f,  7.8f), // Batraal                 // Dzemael Darkhold
             457 => new MapLinkPayload( 362, 146, 10.6f,  6.5f), // gobmachine G-VI         // Brayflox's Longstop (Hard)
             458 => new MapLinkPayload(1039,   9, 15.6f, 8.30f), // Graffias                // The Thousand Maws of Toto-Rak
             459 => new MapLinkPayload( 167,  85, 11.4f, 11.2f), // Anantaboga              // Amdapor Keep
-            460 => new MapLinkPayload( 170,  97,  7.7f,  7.2f), // chimera                 // Cutter's Cry
+            460 => new MapLinkPayload( 1303,  97,  7.7f,  7.2f), // chimera                 // Cutter's Cry
             461 => new MapLinkPayload( 160, 134, 11.3f, 11.3f), // siren                   // Pharos Sirius
             462 => new MapLinkPayload(1036,  31,  4.9f, 17.7f), // Denn the Orcatoothed    // Sastasha
-            463 => new MapLinkPayload( 172,  38,  3.1f,  8.7f), // Miser's Mistress        // Aurum Vale
+            463 => new MapLinkPayload( 1331,  38,  3.1f,  8.7f), // Miser's Mistress        // Aurum Vale
             464 => new MapLinkPayload(1040,  54, 11.2f, 11.3f), // Lady Amandine           // Haukke Manor
             465 => new MapLinkPayload( 1245,  46,  6.1f, 11.7f), // Tangata                 // Halatali
             _ => throw new ArgumentException($"Unregistered MonsterNoteTarget: {monsterTargetId}"),
@@ -279,7 +279,7 @@ internal struct BraveBook {
     private static MapLinkPayload GetFatePosition(uint fateId)
         => fateId switch {
             317 => new MapLinkPayload(139, 19, 26.8f, 18.2f), // Surprise                   // Upper La Noscea
-            424 => new MapLinkPayload(146, 23, 21.0f, 16.0f), // Heroes of the 2nd          // Southern Thanalan
+            424 => new MapLinkPayload(146, 23, 21.3f, 16.7f), // Heroes of the 2nd          // Southern Thanalan
             430 => new MapLinkPayload(146, 23, 24.0f, 26.0f), // Return to Cinder           // Southern Thanalan
             475 => new MapLinkPayload(155, 53, 34.0f, 13.0f), // Bellyful                   // Coerthas Central Highlands
             480 => new MapLinkPayload(155, 53,  8.0f, 11.0f), // Giant Seps                 // Coerthas Central Highlands
@@ -288,23 +288,23 @@ internal struct BraveBook {
             499 => new MapLinkPayload(155, 53, 34.0f, 20.0f), // The Four Winds             // Coerthas Central Highlands
             516 => new MapLinkPayload(156, 25, 15.7f, 14.3f), // Black and Nburu            // Mor Dhona
             517 => new MapLinkPayload(156, 25, 13.0f, 12.0f), // Good to Be Bud             // Mor Dhona
-            521 => new MapLinkPayload(156, 25, 31.0f,  5.0f), // Another Notch on the Torch // Mor Dhona
+            521 => new MapLinkPayload(156, 25, 31.1f,  4.7f), // Another Notch on the Torch // Mor Dhona
             540 => new MapLinkPayload(145, 22, 26.0f, 24.0f), // Quartz Coupling            // Eastern Thanalan
-            543 => new MapLinkPayload(145, 22, 30.0f, 25.0f), // The Big Bagoly Theory      // Eastern Thanalan
+            543 => new MapLinkPayload(145, 22, 30.2f, 25.3f), // The Big Bagoly Theory      // Eastern Thanalan
             552 => new MapLinkPayload(146, 23, 18.0f, 20.0f), // Taken                      // Southern Thanalan
             569 => new MapLinkPayload(138, 18, 21.0f, 19.0f), // Breaching North Tidegate   // Western La Noscea
-            571 => new MapLinkPayload(138, 18, 18.0f, 22.0f), // Breaching South Tidegate   // Western La Noscea
+            571 => new MapLinkPayload(138, 18, 19.1f, 22.2f), // Breaching South Tidegate   // Western La Noscea
             577 => new MapLinkPayload(138, 18, 14.0f, 34.0f), // The King's Justice         // Western La Noscea
             587 => new MapLinkPayload(180, 30, 25.0f, 16.0f), // Schism                     // Outer La Noscea
-            589 => new MapLinkPayload(180, 30, 25.0f, 17.0f), // Make It Rain               // Outer La Noscea
+            589 => new MapLinkPayload(180, 30, 25.3f, 17.9f), // Make It Rain               // Outer La Noscea
             604 => new MapLinkPayload(148,  4, 11.0f, 18.0f), // In Spite of It All         // Central Shroud
             611 => new MapLinkPayload(152,  5, 27.0f, 21.0f), // The Enmity of My Enemy     // East Shroud
             616 => new MapLinkPayload(152,  5, 32.0f, 14.0f), // Breaking Dawn              // East Shroud
-            620 => new MapLinkPayload(152,  5, 23.0f, 14.0f), // Everything's Better        // East Shroud
+            620 => new MapLinkPayload(152,  5, 23.8f, 14.7f), // Everything's Better        // East Shroud
             628 => new MapLinkPayload(153,  6, 32.0f, 25.0f), // What Gored Before          // South Shroud
-            632 => new MapLinkPayload(154,  7, 21.0f, 19.0f), // Rude Awakening             // North Shroud
+            632 => new MapLinkPayload(154,  7, 21.9f, 19.7f), // Rude Awakening             // North Shroud
             633 => new MapLinkPayload(154,  7, 19.0f, 20.0f), // Air Supply                 // North Shroud
-            642 => new MapLinkPayload(147, 24, 21.0f, 29.0f), // The Ceruleum Road          // Northern Thanalan
+            642 => new MapLinkPayload(147, 24, 21.9f, 29.5f), // The Ceruleum Road          // Northern Thanalan
             _ => throw new ArgumentException($"Unregistered FATE: {fateId}"),
         };
 
@@ -318,9 +318,9 @@ internal struct BraveBook {
             649 => new MapLinkPayload(155, 53, 12.5f, 16.8f), // Necrologos: Whispers of the Gem  // Coerthas Central Highlands
             650 => new MapLinkPayload(155, 53, 12.5f, 16.8f), // Got a Gut Feeling about This    // Coerthas Central Highlands
             652 => new MapLinkPayload(155, 53, 12.5f, 16.8f), // The Area's a Bit Sketchy        // Coerthas Central Highlands
-            657 => new MapLinkPayload(156, 25, 29.8f, 12.5f), // Necrologos: The Liminal Ones    // Mor Dhona
-            658 => new MapLinkPayload(156, 25, 29.8f, 12.5f), // Big, Bad Idea                   // Mor Dhona
-            659 => new MapLinkPayload(156, 25, 29.8f, 12.5f), // Put Your Stomp on It            // Mor Dhona
+            657 => new MapLinkPayload(156, 25, 29.9f, 12.55f), // Necrologos: The Liminal Ones    // Mor Dhona
+            658 => new MapLinkPayload(156, 25, 29.9f, 12.55f), // Big, Bad Idea                   // Mor Dhona
+            659 => new MapLinkPayload(156, 25, 29.9f, 12.55f), // Put Your Stomp on It            // Mor Dhona
             848 => new MapLinkPayload(155, 53, 12.3f, 16.7f), // Someone's Got a Big Mouth       // Coerthas Central Highlands
             849 => new MapLinkPayload(155, 53, 12.3f, 16.7f), // An Imp Mobile                   // Coerthas Central Highlands
             853 => new MapLinkPayload(155, 53, 12.3f, 16.7f), // Yellow Is the New Black         // Coerthas Central Highlands

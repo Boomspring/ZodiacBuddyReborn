@@ -8,7 +8,6 @@ using ZodiacBuddy.Stages.Atma;
 using ZodiacBuddy.Stages.Brave;
 using ZodiacBuddy.Stages.Novus;
 using ECommons;
-using ECommons.DalamudServices;
 
 namespace ZodiacBuddy;
 
@@ -19,11 +18,10 @@ public sealed class ZodiacBuddyPlugin : IDalamudPlugin {
     private const string Command = "/pzodiac";
     private const string TargetWindowCommand = "/ztarget";
 
-    private readonly AtmaManager atmaManager;
     private readonly NovusManager novusManager;
     private readonly BraveManager braveManager;
+    
     private readonly WindowSystem windowSystem;
-    internal TargetInfoWindow TargetWindow;
     private readonly ConfigWindow configWindow;
     
     /// <summary>
@@ -40,8 +38,6 @@ public sealed class ZodiacBuddyPlugin : IDalamudPlugin {
         this.windowSystem = new WindowSystem("ZodiacBuddy");
 
         this.windowSystem.AddWindow(this.configWindow = new ConfigWindow());
-        TargetWindow = new TargetInfoWindow();
-        windowSystem.AddWindow(TargetWindow);
         Service.Interface.UiBuilder.OpenConfigUi += this.OnOpenConfigUi;
         Service.Interface.UiBuilder.Draw += this.windowSystem.Draw;
 
@@ -49,36 +45,30 @@ public sealed class ZodiacBuddyPlugin : IDalamudPlugin {
             HelpMessage = "Open a window to edit various settings.",
             ShowInHelp = true,
         });
-        Service.CommandManager.AddHandler(TargetWindowCommand, new CommandInfo(OnTargetWindowCommand)
-        {
-            HelpMessage = "Open the ZodiacBuddy target tracking window.",
-            ShowInHelp = true,
-        });
+        // Service.CommandManager.AddHandler(TargetWindowCommand, new CommandInfo(OnTargetWindowCommand)
+        // {
+        //     HelpMessage = "Open the ZodiacBuddy target tracking window.",
+        //     ShowInHelp = true,
+        // });
 
         Service.BonusLightManager = new BonusLightManager();
         this.novusManager = new NovusManager();
         this.braveManager = new BraveManager();
-        this.atmaManager = new AtmaManager();
-        AutoDutyIpc.Init();
+        Service.AtmaManager = new AtmaManager(pluginInterface);
     }
 
     /// <inheritdoc/>
     public void Dispose() {
         Service.CommandManager.RemoveHandler(Command);
-        windowSystem.RemoveWindow(TargetWindow);
         Service.CommandManager.RemoveHandler(TargetWindowCommand);
         Service.Interface.UiBuilder.Draw -= this.windowSystem.Draw;
         Service.Interface.UiBuilder.OpenConfigUi -= this.OnOpenConfigUi;
 
-        this.atmaManager.Dispose();
         this.novusManager.Dispose();
         this.braveManager.Dispose();
         Service.BonusLightManager.Dispose();
-        ECommons.ECommonsMain.Dispose();
-    }
-    private void OnTargetWindowCommand(string command, string arguments)
-    {
-        TargetWindow.IsOpen = true;
+        Service.AtmaManager.Dispose();
+        ECommonsMain.Dispose();
     }
 
     /// <summary>
