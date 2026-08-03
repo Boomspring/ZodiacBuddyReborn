@@ -81,6 +81,10 @@ public partial class AtmaManager : IDisposable
     // Cancellation support
     internal CancellationTokenSource? Cts;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="AtmaManager"/> class.
+    /// </summary>
+    /// <param name="pluginInterface">Dalamud plugin interface.</param>
     public AtmaManager(IDalamudPluginInterface pluginInterface)
     {
         // Initialise Services and Listeners
@@ -114,10 +118,12 @@ public partial class AtmaManager : IDisposable
             InitializeRelicEventItem();
         }
         
+        // Framework Updates
         Service.Framework.Update += this._atmaWindow.FindNearest;
         Service.Framework.Update += DoesEquippedContainExpectedRelic;
     }
 
+    /// <inheritdoc/>
     public void Dispose()
     {
         Cts?.Dispose();
@@ -135,14 +141,24 @@ public partial class AtmaManager : IDisposable
         Service.AddonLifecycle.UnregisterListener(AddonEvent.PostReceiveEvent, "RelicNoteBook", ReceiveRelicNoteBookEvent);
     }
 
+    /// <summary>
+    /// Opens an instance of <see cref="AtmaWindow"/> class.
+    /// </summary>
+    /// <param name="command">Unused (part of <see cref="CommandInfo"/>)</param>
+    /// <param name="args">Unused (part of <see cref="CommandInfo"/>)</param>
     private void OpenAtmaWindow(string command, string args)
     {
         this._atmaWindow.IsOpen = true;
     }
-
-    // --------------------- Command --------------------- /
     
-    private unsafe void ReceiveRelicNoteBookEvent(AddonEvent type, AddonArgs args)
+    /// <summary>
+    /// Runs whenever the user clicks on an item inside the Relic Book. It
+    /// automatically determines what is being clicked, and either teleports to
+    /// the target and or navigates to it, or starts <see cref="AutoDuty"/> instance.
+    /// </summary>
+    /// <param name="type">What type of addon is being used (i.e. PreReceive, PostReceive)</param>
+    /// <param name="args">Properties of the addon</param>
+    private void ReceiveRelicNoteBookEvent(AddonEvent type, AddonArgs args)
     {
         // First, cleanly check if the event is for us
         if (args is not AddonReceiveEventArgs
@@ -159,6 +175,7 @@ public partial class AtmaManager : IDisposable
         // We know it's for us, so let's create an object we can go over
         GetRelicNoteBookVariables(receiveEventArgs, out var braveBook, out var braveTarget, out var completion, out var total);
         
+        // Safeguarding
         if (!_usingCorrectRelic)
         {
             Service.ChatGui.PrintError($"[ZodiacBuddy] Weapon used does not match book.");
@@ -171,6 +188,7 @@ public partial class AtmaManager : IDisposable
             return; 
         }
 
+        // Setters for the AtmaWindow
         this._atmaWindow.Target = braveTarget;
         this._atmaWindow.Completion = completion;
         this._atmaWindow.Total = total;
@@ -182,11 +200,18 @@ public partial class AtmaManager : IDisposable
             return;
         }
 
+        // Async move to location
         MarkFlagAndFly(braveTarget);
     }
     
+    /// <summary>
+    /// Receives system messages and checks if the user killed a <see cref="BraveTarget"/>. It updates the
+    /// <see cref="AtmaWindow"/> properties and if the goal is met, pathing is stopped.
+    /// </summary>
+    /// <param name="message">Properties of the chat message</param>
     private void OnRelicEnemyKill(IHandleableChatMessage message)
     {
+        // Validation of the message
         if (message.LogKind != XivChatType.SystemMessage)
             return;
 
@@ -198,11 +223,13 @@ public partial class AtmaManager : IDisposable
         
         Service.PluginLog.Debug($"{SmartCaseHelper.SmartTitleCase(m.Groups[1].Value)} killed.");
 
+        // Was it for enemies or dungeons?
         var enemyCheck = _currentBook.Value.Enemies
             .FirstOrNull(target => target.Name == m.Groups[1].Value);
         var dungeonCheck = _currentBook.Value.Dungeons
             .FirstOrNull(target => target.Name == m.Groups[1].Value);
 
+        // Update AtmaWindow
         if (enemyCheck.HasValue) _atmaWindow.Target = enemyCheck;
         if (dungeonCheck.HasValue) _atmaWindow.Target = dungeonCheck;
         _atmaWindow.Completion = byte.Parse(m.Groups[2].Value[..1]);
@@ -212,8 +239,14 @@ public partial class AtmaManager : IDisposable
         CancelPathfinding();
     }
     
+    /// <summary>
+    /// Receives system messages and checks if the user finished a FATE or level. It updates the
+    /// <see cref="AtmaWindow"/> properties.
+    /// </summary>
+    /// <param name="message">Properties of the chat message</param>
     private void OnRelicFateOrLeveKill(IHandleableChatMessage message)
     {
+        // Validation of the message
         if (message.LogKind != XivChatType.SystemMessage)
             return;
 
@@ -224,19 +257,30 @@ public partial class AtmaManager : IDisposable
 
         if (!_currentBook.HasValue) return;
 
+        // Was it for FATE or Leve?
+        // Update AtmaWindow
         if (a.Success && _atmaWindow.Target?.FateId == 0) _atmaWindow.Target = null;
         if (b.Success && _atmaWindow.Target?.Issuer.IsNullOrEmpty() == true) _atmaWindow.Target = null;
         _atmaWindow.Completion = 1;
         _atmaWindow.Total = 1;
     }
     
+    /// <summary>
+    /// Receives system messages and checks if the user changed their Relic Book, either adding a new one
+    /// or discarding their old one. It updates the <see cref="AtmaWindow"/> properties as well as caching a
+    /// <see cref="RelicBookGameItem"/>.
+    /// </summary>
+    /// <param name="message">Properties of the chat message</param>
     private void OnBookChanged(IHandleableChatMessage message)
     {
+        // Validation of the message?
         if (message.LogKind != XivChatType.SystemMessage)
             return;
 
+        // Is the book added or removed?
         if (BookRemovedRegex().IsMatch(message.Message.TextValue))
         {
+            // Update AtmaWindow and cache variables
             this._atmaWindow.Target = null;
             this._atmaWindow.Completion = 0;
             this._atmaWindow.Total = 0;
@@ -249,11 +293,16 @@ public partial class AtmaManager : IDisposable
         }
     }
 
+    /// <summary>
+    /// Triggers <see cref="AutoDuty"/> to start the requested dungeon as unsynced.
+    /// </summary>
+    /// <param name="braveTarget">The dungeon being run</param>
     private static void StartAutoDuty(BraveTarget braveTarget)
     {
         var started = false;
         var territoryId = braveTarget.Position.TerritoryType.RowId;
         
+        // Attempts to start the instance
         if (AutoDuty.Enabled)
         {
             if (AutoDuty.ContentHasPath(territoryId))
@@ -272,6 +321,7 @@ public partial class AtmaManager : IDisposable
             return;
         }
 
+        // Backup to open DutyFinder list
         unsafe
         {
             AgentContentsFinder.Instance()->OpenRegularDuty(braveTarget.ContentsFinderConditionId);
@@ -280,8 +330,10 @@ public partial class AtmaManager : IDisposable
         Service.ChatGui.PrintError($"[ZodiacBuddy] AutoDuty unavailable. Opened Duty Finder for {braveTarget.Position.PlaceName}.");
     }
 
-    // --------------------- Routine --------------------- /
-
+    /// <summary>
+    /// Attempts to mark the position of the target, teleport (if required) and navigate to it.
+    /// </summary>
+    /// <param name="braveTarget">The objective (i.e. enemy, FATE, Leve)</param>
     internal void MarkFlagAndFly(BraveTarget braveTarget)
     {
         FlagTargetOnMap(braveTarget.Position);
@@ -295,8 +347,15 @@ public partial class AtmaManager : IDisposable
         });
     }
     
+    /// <summary>
+    /// Teleports the user if in a different region, then asynchronously fly to the position, and then
+    /// asynchronously attempt to dismount.
+    /// </summary>
+    /// <param name="braveTarget">The objective (i.e. enemy, FATE, Leve)</param>
+    /// <param name="token">Used to cancel the task (e.g. if the user moves)</param>
     private async Task<bool> FlyRoutineAsync(BraveTarget braveTarget, CancellationToken token)
     {
+        // Safeguards
         if (!VNavmesh.Enabled)
         {
             Service.PluginLog.Error("Navmesh not enabled.");
@@ -399,12 +458,15 @@ public partial class AtmaManager : IDisposable
         return false;
     }
 
-    // --------------------- Helpers --------------------- /
-
+    /// <summary>
+    /// Checks to see if the user has added a new Relic Book, and if so, caches the <see cref="RelicBookGameItem"/> and
+    /// updates the <see cref="AtmaWindow"/> properties.
+    /// </summary>
     private void InitializeRelicEventItem()
     {
         var excelItems = Service.DataManager.GetExcelSheet<EventItem>();
     
+        // Searches every key item in the inventory for the Relic Book
         foreach (var i in Service.GameInventory.GetInventoryItems(GameInventoryType.KeyItems))
         {
             var excelItem = excelItems
@@ -414,6 +476,7 @@ public partial class AtmaManager : IDisposable
             if (!excelItem.HasValue)
                 continue;
 
+            // Update AtmaWindow and cache variables
             this._atmaWindow.Target = null;
             this._atmaWindow.Completion = 0;
             this._atmaWindow.Total = 0;
@@ -424,10 +487,16 @@ public partial class AtmaManager : IDisposable
         }
     }
     
+    /// <summary>
+    /// Finds out which elements of the Relic Book is currently being shown
+    /// </summary>
+    /// <param name="addon">The GUI representing the Relic Book</param>
+    /// <param name="receiveEventArgs">Properties of the button press</param>
     private static (int selectedCategoryIndex, int selectedNodeIndex) GetTargets(
         AddonRelicNoteBook addon, 
         AddonReceiveEventArgs receiveEventArgs)
     {
+        // List of nodes based on selected index
         var targetNodesDict = new Dictionary<int, AddonRelicNoteBook.TargetNode[]>
         {
             [0] =
@@ -463,6 +532,7 @@ public partial class AtmaManager : IDisposable
             ]
         };
         
+        // Searches for the selected item in any of the lists and return the correct group
         for (var selectedCategoryIndex = 0; selectedCategoryIndex < 4; selectedCategoryIndex++)
         {
             var targetNodes = targetNodesDict[selectedCategoryIndex];
@@ -482,6 +552,11 @@ public partial class AtmaManager : IDisposable
         return (-1, -1);
     }
     
+    /// <summary>
+    /// Finds out which group of elements of the Relic Book is currently being shown
+    /// </summary>
+    /// <param name="braveBook">Instance of <see cref="BraveBook"/></param>
+    /// <param name="index">The selected index</param>
     private static BraveTarget[] GetContainer(BraveBook braveBook,
         int index)
     {
@@ -493,15 +568,15 @@ public partial class AtmaManager : IDisposable
             [3] = braveBook.Leves
         }.GetValueOrDefault(index, []);
     }
-
-    private List<Item> FindRelicItems()
-    {
-        return Service.GameInventory.GetInventoryItems(GameInventoryType.EquippedItems).ToArray()
-            .Where(item => _listOfRelics.Contains(item.ItemId))
-            .SelectMulti(item => Item.Get(item.ItemId))
-            .ToList();
-    }
     
+    /// <summary>
+    /// Uses the addon information to determine properties of the Relic Book.
+    /// </summary>
+    /// <param name="receiveEventArgs">Properties of the button press</param>
+    /// <param name="braveBook">Instance of <see cref="BraveBook"/></param>
+    /// <param name="braveTarget">Instance of <see cref="BraveTarget"/></param>
+    /// <param name="completion">Current progress to complete the goal</param>
+    /// <param name="total">Total needed to complete the goal</param>
     private static unsafe void GetRelicNoteBookVariables(AddonReceiveEventArgs receiveEventArgs,
         out BraveBook braveBook, out BraveTarget braveTarget, out byte completion, out byte total)
     {
@@ -521,13 +596,20 @@ public partial class AtmaManager : IDisposable
         total = Convert.ToByte(targets.selectedCategoryIndex == 0 ? 3 : 1);
     }
     
+    /// <summary>
+    /// Translates a <see cref="MapLinkPayload"/> into the coordinates of the target (flag or aetheryte) on the map.
+    /// </summary>
+    /// <param name="payload">Coordinates of the target (flag or aetheryte)</param>
     private static (float AetherstreamX, float AetherstreamY) GetAetherstreamCoords(MapLinkPayload payload)
     {
         return ((payload.RawX / 1000f + payload.Map.Value.OffsetX) * payload.Map.Value.SizeFactor / 100f, 
             (payload.RawY / 1000f + payload.Map.Value.OffsetY) * payload.Map.Value.SizeFactor / 100f);
     }
-
     
+    /// <summary>
+    /// Marks the position of the <see cref="MapLinkPayload"/> as a flag on the map.
+    /// </summary>
+    /// <param name="position">Coordinates of the location</param>
     private static unsafe void FlagTargetOnMap(MapLinkPayload position)
     {
         // Flag the target on the map
@@ -541,6 +623,10 @@ public partial class AtmaManager : IDisposable
             coords.AetherstreamX, coords.AetherstreamY);
     }
     
+    /// <summary>
+    /// Finds the nearest aetheryte to the <see cref="MapLinkPayload"/> and teleports the user there.
+    /// </summary>
+    /// <param name="mapLink">Coordinates to teleport to (roughly)</param>
     private static unsafe void TeleportToNearestAetheryte(MapLinkPayload mapLink)
     {
         var coords = GetAetherstreamCoords(mapLink);
@@ -554,6 +640,10 @@ public partial class AtmaManager : IDisposable
             .First().RowId, 0);
     }
 
+    /// <summary>
+    /// Checks to see if FATE is running. Must be located in the same territory as the target.
+    /// </summary>
+    /// <param name="braveTarget">Information about the FATE</param>
     internal static bool IsFateRunning(BraveTarget braveTarget)
     {
         if (braveTarget.FateId == 0) return false;
@@ -565,6 +655,12 @@ public partial class AtmaManager : IDisposable
         return isActive != null;
     }
 
+    /// <summary>
+    /// Asynchronously wait for a boolean condition to resolve and compare against the expected state. Can be cancelled.
+    /// </summary>
+    /// <param name="condition">Boolean function that is ran every 200ms and evaluated again expected state.</param>
+    /// <param name="state">Expected result of condition.</param>
+    /// <param name="token">Used to cancel (e.g. if the user moved).</param>
     private static async Task<bool> WaitForConditions(Func<bool> condition, bool state, CancellationToken token)
     {
         return await Svc.Framework.RunOnTick(async () =>
@@ -580,6 +676,10 @@ public partial class AtmaManager : IDisposable
         }, cancellationToken: token);
     }
     
+    /// <summary>
+    /// Asynchronously wait for the user to be mounted.
+    /// </summary>
+    /// <param name="token">Used to cancel (e.g. if the user moved).</param>
     private static Task WaitForMountAsync(CancellationToken token)
     {
         return Svc.Framework.RunOnTick(async () =>
@@ -592,6 +692,12 @@ public partial class AtmaManager : IDisposable
         }, cancellationToken: token);
     }
 
+    /// <summary>
+    /// Asynchronously move the user to the specified position.
+    /// </summary>
+    /// <param name="target">Position being moved to.</param>
+    /// <param name="token">Used to cancel (e.g. if the user moved during the automove).</param>
+    /// <param name="fly">Is the user going via air or via walking?</param>
     internal async Task<bool> MoveToAsync(Vector3 target, CancellationToken token, bool fly = true)
     {
         const float distThreshold = 3f;
@@ -617,6 +723,7 @@ public partial class AtmaManager : IDisposable
                 {
                     if (Cts != null)
                     {
+                        // VNavmesh aborted pathfinding because user moved.
                         CancelPathfinding();
                     }
                 }
@@ -629,6 +736,7 @@ public partial class AtmaManager : IDisposable
             }
             else if (fly && !Svc.Condition[ConditionFlag.Mounted] && Cts != null)
             {
+                // User manually dismounted
                 CancelPathfinding();
             }
 
@@ -638,6 +746,9 @@ public partial class AtmaManager : IDisposable
         return false;
     }
 
+    /// <summary>
+    /// Triggers mount action via roulette.
+    /// </summary>
     private static unsafe bool Mount
     {
         get
@@ -650,6 +761,10 @@ public partial class AtmaManager : IDisposable
             return true;
         }
     }
+    
+    /// <summary>
+    /// Triggers mount (dismount) action.
+    /// </summary>
     private static unsafe void Dismount()
     {
         if (!Svc.Condition[ConditionFlag.Mounted]) return;
@@ -658,6 +773,10 @@ public partial class AtmaManager : IDisposable
             am->UseAction(ActionType.Mount, 0);
     }
 
+    /// <summary>
+    /// Asynchronously attempt to dismount the user.
+    /// </summary>
+    /// <param name="token">Used to cancel (e.g. if the user moved).</param>
     private static async Task<bool> DismountAsync(CancellationToken token)
     {
         const int dismountDelayMs = 420;
@@ -676,11 +795,13 @@ public partial class AtmaManager : IDisposable
                 await Task.Delay(dismountDelayMs, token);
             }
 
+            // Already dismounted?
             if (!Svc.Condition[ConditionFlag.Mounted])
                 return true;
 
             if (Svc.Condition[ConditionFlag.InFlight])
             {
+                // Try to find a safe position to move to after failing to dismount.
                 Service.PluginLog.Warning($"Trying to recover after failing to dismount.");
 
                 var player = await Svc.Framework.RunOnTick(() => Svc.ClientState.LocalPlayer, cancellationToken: token);
@@ -718,6 +839,9 @@ public partial class AtmaManager : IDisposable
         return false;
     }
 
+    /// <summary>
+    /// Stops the <see cref="VNavmesh"/> and cancels the token.
+    /// </summary>
     private async void CancelPathfinding()
     {
         try
@@ -738,6 +862,7 @@ public partial class AtmaManager : IDisposable
     {
         try
         {
+            // Safeguards
             var instance = RelicNote.Instance();
             if (instance == null) return;
             var expectedId = instance->RelicId;
@@ -745,9 +870,13 @@ public partial class AtmaManager : IDisposable
             if (_stopwatch.Elapsed < TimeSpan.FromSeconds(1)) return;
             _stopwatch.Restart();
 
+            // Checks if the user has the expected relic that matches the book. The expected id starts at 1 and is one
+            // higher than the enum of relics used in the backend, so we remove 1.
             _usingCorrectRelic = Service.GameInventory.GetInventoryItems(GameInventoryType.EquippedItems).ToArray()
                 .Any(item => _listOfRelics.ElementAt(expectedId - 1) == item.ItemId);
             if (_usingCorrectRelic) return;
+            
+            // Update AtmaWindow
             _atmaWindow.Target = null;
             _atmaWindow.Completion = 0;
             _atmaWindow.Total = 0;
@@ -758,6 +887,7 @@ public partial class AtmaManager : IDisposable
         }
     }
     
+    // Syntax of different Regex
     [GeneratedRegex(@"^Record of FATE completion added for .*$", RegexOptions.IgnoreCase | RegexOptions.Compiled, "en-GB")]
     private static partial Regex FateCompletionRegex();
     

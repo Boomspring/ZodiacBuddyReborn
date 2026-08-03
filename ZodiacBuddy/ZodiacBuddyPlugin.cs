@@ -45,11 +45,6 @@ public sealed class ZodiacBuddyPlugin : IDalamudPlugin {
             HelpMessage = "Open a window to edit various settings.",
             ShowInHelp = true,
         });
-        // Service.CommandManager.AddHandler(TargetWindowCommand, new CommandInfo(OnTargetWindowCommand)
-        // {
-        //     HelpMessage = "Open the ZodiacBuddy target tracking window.",
-        //     ShowInHelp = true,
-        // });
 
         Service.BonusLightManager = new BonusLightManager();
         this.novusManager = new NovusManager();

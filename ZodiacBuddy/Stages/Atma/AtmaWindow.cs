@@ -20,6 +20,10 @@ using ZodiacBuddy.SmartCaseUtil;
 
 namespace ZodiacBuddy.Stages.Atma;
 
+/// <summary>
+/// The <see cref="AtmaWindow"/> is a window that displays information about the current <see cref="BraveTarget"/>,
+/// including the status of <see cref="VNavmesh"/> and <see cref="AutoDuty"/>.
+/// </summary>
 internal class AtmaWindow : Window
 {
     public BraveTarget? Target;
@@ -27,6 +31,9 @@ internal class AtmaWindow : Window
     public byte Total;
     private Stopwatch _pathingTimer = new();
     
+    /// <summary>
+    /// Initializes a new instance of the <see cref="AtmaWindow"/> class.
+    /// </summary>
     public AtmaWindow() : base("Atma Window", ImGuiWindowFlags.AlwaysAutoResize)
     { 
         IsOpen = Service.Configuration.IsAtmaWindowOpen;
@@ -37,27 +44,33 @@ internal class AtmaWindow : Window
         };
     }
     
-    // Main Methods
-    
+    /// <summary>
+    /// Called when the window is opened.
+    /// </summary>
     public override void OnOpen()
     {
         Service.Configuration.IsAtmaWindowOpen = true;
         Service.Configuration.Save();
     }
     
+    /// <summary>
+    /// Called when the window is closed.
+    /// </summary>
     public override void OnClose()
     {
         Service.Configuration.IsAtmaWindowOpen = false;
         Service.Configuration.Save();
     }
     
-    /*
-     Read-only checkbox that draws:
-     - Checked: green tick
-     - Unchecked: red cross
-     - Optional: yellow '?' indicator (non-interactive by default).
-     */
-    private static void TickCrossCheckbox(string label, bool state, bool useQuestionMark = false, string errorText = "")
+
+    /// <summary>
+    /// Read-only checkbox that draws a green tick for checked, red cross for unchecked, and a yellow question mark for optional.
+    /// </summary>
+    /// <param name="label">The label to display next to the checkbox.</param>
+    /// <param name="state">The current state of the checkbox.</param>
+    /// <param name="useQuestionMark">Whether to display a yellow question mark instead of a red cross.</param>
+    /// <param name="description">The text to display when the checkbox is in an error state.</param>
+    private static void TickCrossCheckbox(string label, bool state, bool useQuestionMark = false, string description = "")
     {
         var style = ImGui.GetStyle();
         var boxSize = ImGui.GetFrameHeight();
@@ -121,11 +134,11 @@ internal class AtmaWindow : Window
             );
 
             dl.AddText(qmTextPos, qmTextU32, qm);
-            if (string.IsNullOrEmpty(errorText)) return;
+            if (string.IsNullOrEmpty(description)) return;
             ImGui.SetCursorScreenPos(cursor);
             ImGui.InvisibleButton($"##hover_qm_{label}", new Vector2(boxSize, boxSize));
 
-            if (ImGui.IsItemHovered()) ImGui.SetTooltip(errorText);
+            if (ImGui.IsItemHovered()) ImGui.SetTooltip(description);
         }
         else
         {
@@ -154,13 +167,14 @@ internal class AtmaWindow : Window
                 label);
         }
 
-        if (string.IsNullOrEmpty(errorText)) return;
+        if (string.IsNullOrEmpty(description)) return;
         ImGui.SetCursorScreenPos(cursor);
         ImGui.InvisibleButton($"##hover_qm_{label}", new Vector2(boxSize, boxSize));
 
-        if (ImGui.IsItemHovered()) ImGui.SetTooltip(errorText);
+        if (ImGui.IsItemHovered()) ImGui.SetTooltip(description);
     }
 
+    /// <inheritdoc/>
     public override void Draw()
     {
         if (!DependenciesMet()) return;
@@ -188,6 +202,9 @@ internal class AtmaWindow : Window
         ImGui.EndTable();
     }
 
+    /// <summary>
+    /// Displays information about the <see cref="BraveTarget"/>.
+    /// </summary>
     private void RenderTargetStatus()
     {
         var normalColourVector = Completion switch
@@ -203,6 +220,7 @@ internal class AtmaWindow : Window
             _ => new Vector4(1f, 0f, 0f, 1f),
         };
         
+        // Add target information
         ImGui.TableSetColumnIndex(0);
         ImGui.Text("Target:");
         ImGui.TableNextColumn();
@@ -214,6 +232,7 @@ internal class AtmaWindow : Window
         {
             switch (Target)
             {
+                // Adds Leve information
                 case { Issuer.Length: > 0 }:
                     ImGui.Text("Issuer:");
                     ImGui.TableNextColumn();
@@ -222,6 +241,7 @@ internal class AtmaWindow : Window
                     ImGui.TableNextRow();
                     ImGui.TableSetColumnIndex(0);
                     break;
+                // Adds Fate Information
                 case { FateId: > 0 } when Completion == 0:
                     ImGui.Text("Status:");
                     ImGui.TableNextColumn();
@@ -246,6 +266,7 @@ internal class AtmaWindow : Window
                     break;
             }
         }
+        // Adds Completion information
         ImGui.Text("Complete:");
         ImGui.TableNextColumn();
         if (Target is { ContentsFinderConditionId: 0, FateId: 0 } && Target.Value.Issuer.IsNullOrEmpty())
@@ -258,8 +279,11 @@ internal class AtmaWindow : Window
         }
     }
 
-    // Helpers
-
+    /// <summary>
+    /// If any of the required dependencies are not met, this will update the <see cref="AtmaWindow"/> with crosses for
+    /// manditory dependencies, question marks for optional dependencies, and a comment describing what the dependencies
+    /// are used for.
+    /// </summary>
     private static bool DependenciesMet()
     {
         var dependencies = new Dictionary<string, (bool enabled, bool required, string desc)>
@@ -277,6 +301,9 @@ internal class AtmaWindow : Window
         return false;
     }
     
+    /// <summary>
+    /// Uses a specific game item. For example, if the item is a relic book, it will open it.
+    /// </summary>
     private static unsafe void UseItem(GameInventoryItem gameItem)
     {
         var agentModule = Framework.Instance()->GetUIModule()->GetAgentModule();
@@ -291,6 +318,9 @@ internal class AtmaWindow : Window
             (InventoryType) gameItem.ContainerType, gameItem.InventorySlot);
     }
     
+    /// <summary>
+    /// Creates a button that opens the <see cref="RelicNote"/> when clicked, if it exists.
+    /// </summary>
     private void RenderRelicBookButton()
     {
         if (Service.AtmaManager.RelicBookGameItem.HasValue)
@@ -306,6 +336,9 @@ internal class AtmaWindow : Window
         }
     }
 
+    /// <summary>
+    /// Displays information about <see cref="VNavmesh"/> status.
+    /// </summary>
     private static void RenderVNavMesh()
     {
         ImGui.TableSetColumnIndex(0);
@@ -325,6 +358,9 @@ internal class AtmaWindow : Window
         }
     }
     
+    /// <summary>
+    /// Displays information about <see cref="AutoDuty"/> status.
+    /// </summary>
     private static void RenderAutoDuty()
     {
         ImGui.TableSetColumnIndex(0);
@@ -336,6 +372,11 @@ internal class AtmaWindow : Window
         }
     }
     
+    /// <summary>
+    /// Periodically attempts to check the nearest mob every 2 seconds, or fall back to the flag
+    /// every 5 seconds if there are no results.
+    /// </summary>
+    /// <param name="framework">Unused, but required for per-tick function</param>
     internal async void FindNearest(IFramework framework)
     {
         try
@@ -372,6 +413,7 @@ internal class AtmaWindow : Window
 
             switch (_pathingTimer.IsRunning)
             {
+                // Fall back to the flag if there are no results
                 case true when nearest == null
                                && Target.Value is { ContentsFinderConditionId: 0, FateId: 0 }
                                && Target.Value.Issuer.IsNullOrEmpty()
@@ -385,6 +427,7 @@ internal class AtmaWindow : Window
                     Service.AtmaManager.Cts = null;
                 }
                     return;
+                // Otherwise, attempt to path to the nearest mob every 2 seconds
                 case true when nearest != null && _pathingTimer.Elapsed > TimeSpan.FromSeconds(2):
                 {
                     _pathingTimer.Reset();
