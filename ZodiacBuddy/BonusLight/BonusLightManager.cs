@@ -146,7 +146,7 @@ public class BonusLightManager : IDisposable {
         }
 
         foreach (var s in message) {
-            Service.Plugin.PrintMessage(s);
+            ZodiacBuddyPlugin.PrintMessage(s);
         }
 
         if (LightConfiguration.PlaySoundOnLightBonusNotification) {

@@ -26,29 +26,22 @@ internal class ConfigWindow : Window {
 
     /// <inheritdoc/>
     public override void Draw() {
-        if (ImGui.CollapsingHeader("General"))
-            this.DrawGeneral();
+        if (ImGui.CollapsingHeader("General")) DrawGeneral();
 
-        if (ImGui.CollapsingHeader("Interface"))
-            this.DrawInterface();
+        if (ImGui.CollapsingHeader("Interface")) DrawInterface();
 
-        if (ImGui.CollapsingHeader("Bonus Light"))
-            this.DrawBonusLight();
+        if (ImGui.CollapsingHeader("Bonus Light")) DrawBonusLight();
 
-        if (ImGui.CollapsingHeader("Atma"))
-            this.DrawAtma();
+        if (ImGui.CollapsingHeader("Atma")) DrawAtma();
 
-        if (ImGui.CollapsingHeader("Novus"))
-            this.DrawNovus();
+        if (ImGui.CollapsingHeader("Novus")) DrawNovus();
 
-        if (ImGui.CollapsingHeader("Brave"))
-            this.DrawBrave();
+        if (ImGui.CollapsingHeader("Brave")) DrawBrave();
         
-        if (Service.Interface.IsDevMenuOpen && ImGui.CollapsingHeader("Debug"))
-            this.Debug();
+        if (Service.Interface.IsDevMenuOpen && ImGui.CollapsingHeader("Debug")) Debug();
     }
 
-    private void DrawGeneral() {
+    private static void DrawGeneral() {
         var names = Enum.GetNames<XivChatType>();
         var channels = Enum.GetValues<XivChatType>();
         var current = Array.IndexOf(channels, Service.Configuration.ChatType);
@@ -64,13 +57,9 @@ internal class ConfigWindow : Window {
         }
 
         ImGui.Spacing();
-
-        if (ImGui.Checkbox("Disable Teleport", ref Service.Configuration.DisableTeleport)) {
-            Service.Configuration.Save();
-        }
     }
 
-    private void DrawInterface() {
+    private static void DrawInterface() {
         var manualSize = Service.Configuration.InformationWindow.ManualSize;
         if (ImGui.Checkbox("Manual size for relic information", ref manualSize)) {
             Service.Configuration.InformationWindow.ManualSize = manualSize;
@@ -113,7 +102,7 @@ internal class ConfigWindow : Window {
         ImGui.Spacing();
     }
 
-    private void DrawBonusLight() {
+    private static void DrawBonusLight() {
         string status;
         Vector4 statusColor;
         if (Service.BonusLightManager.LastRequestIsSuccess) {
@@ -165,24 +154,37 @@ internal class ConfigWindow : Window {
         ImGui.Spacing();
     }
 
-    private void DrawAtma() {
+    private static void DrawAtma() {
         ImGui.Text("Pro tip: Use the Sonar plugin to track Fate uptime across your entire datacenter.\n");
 
-        var braveEcho = Service.Configuration.BraveEchoTarget;
+        var atmaEnabled = Service.Configuration.AtmaConfiguration.Enabled;
+        if (ImGui.Checkbox("Enable Atma Manager", ref atmaEnabled)) {
+            Service.Configuration.AtmaConfiguration.Enabled = atmaEnabled;
+            Service.Configuration.Save();
+        }
+        
+        var braveEcho = Service.Configuration.AtmaConfiguration.BraveEchoTarget;
         if (ImGui.Checkbox("Display target selection in chat", ref braveEcho)) {
-            Service.Configuration.BraveEchoTarget = braveEcho;
+            Service.Configuration.AtmaConfiguration.BraveEchoTarget = braveEcho;
             Service.Configuration.Save();
         }
 
-        var braveCopy = Service.Configuration.BraveCopyTarget;
+        var braveCopy = Service.Configuration.AtmaConfiguration.BraveCopyTarget;
         if (ImGui.Checkbox("Copy name of target to clipboard automatically", ref braveCopy)) {
-            Service.Configuration.BraveCopyTarget = braveCopy;
+            Service.Configuration.AtmaConfiguration.BraveCopyTarget = braveCopy;
             Service.Configuration.Save();
         }
+
+        var disableTeleport = Service.Configuration.AtmaConfiguration.DisableTeleport;
+        if (ImGui.Checkbox("Disable teleport", ref disableTeleport)) {
+            Service.Configuration.AtmaConfiguration.DisableTeleport = disableTeleport;
+            Service.Configuration.Save();
+        }
+
         ImGui.Spacing();
     }
 
-    private void DrawNovus() {
+    private static void DrawNovus() {
         var showRelicWindow = Service.Configuration.Novus.DisplayRelicInfo;
         if (ImGui.Checkbox("Display Novus relic information when equipped", ref showRelicWindow)) {
             Service.Configuration.Novus.DisplayRelicInfo = showRelicWindow;
@@ -204,7 +206,7 @@ internal class ConfigWindow : Window {
         ImGui.Spacing();
     }
 
-    private void DrawBrave() {
+    private static void DrawBrave() {
         var showRelicWindow = Service.Configuration.Brave.DisplayRelicInfo;
         if (ImGui.Checkbox("Display Zodiac Brave relic information when equipped", ref showRelicWindow)) {
             Service.Configuration.Brave.DisplayRelicInfo = showRelicWindow;
@@ -226,7 +228,7 @@ internal class ConfigWindow : Window {
         ImGui.Spacing();
     }
     
-    private void Debug() {
+    private static void Debug() {
         if (ImGui.Button("Check duties territory"))
             DebugTools.CheckBonusLightDutyTerritories();
     }

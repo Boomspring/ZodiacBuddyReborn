@@ -6,6 +6,7 @@ using ZodiacBuddy.BonusLight;
 using ZodiacBuddy.InformationWindow;
 using ZodiacBuddy.Stages.Brave;
 using ZodiacBuddy.Stages.Novus;
+using ZodiacBuddy.Stages.Atma;
 
 namespace ZodiacBuddy;
 
@@ -14,12 +15,8 @@ public class PluginConfiguration : IPluginConfiguration {
 
     [JsonProperty("BraveEchoChannel")] public XivChatType ChatType { get; set; } = XivChatType.Echo;
 
-    public bool BraveEchoTarget { get; set; } = true;
-    public bool IsAtmaWindowOpen { get; set; } = false;
-    public bool BraveCopyTarget { get; set; } = true;
+    public AtmaConfiguration AtmaConfiguration { get; } = new();
 
-    [JsonPropertyName("IsAtmaManagerEnabled")]
-    public bool IsAtmaManagerEnabled { get; set; } = false;
     public BonusLightConfiguration BonusLight { get; } = new();
 
     public NovusConfiguration Novus { get; } = new();
@@ -27,8 +24,6 @@ public class PluginConfiguration : IPluginConfiguration {
     public BraveConfiguration Brave { get; } = new();
 
     public InformationWindowConfiguration InformationWindow { get; } = new();
-
-    public bool DisableTeleport = false;
-
+    
     public void Save() => Service.Interface.SavePluginConfig(this);
 }

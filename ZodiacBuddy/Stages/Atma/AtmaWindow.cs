@@ -36,7 +36,7 @@ internal class AtmaWindow : Window
     /// </summary>
     public AtmaWindow() : base("Atma Window", ImGuiWindowFlags.AlwaysAutoResize)
     { 
-        IsOpen = Service.Configuration.IsAtmaWindowOpen;
+        IsOpen = Service.Configuration.AtmaConfiguration.DisplayAtmaWindow;
 
         SizeConstraints = new WindowSizeConstraints
         {
@@ -49,7 +49,7 @@ internal class AtmaWindow : Window
     /// </summary>
     public override void OnOpen()
     {
-        Service.Configuration.IsAtmaWindowOpen = true;
+        Service.Configuration.AtmaConfiguration.DisplayAtmaWindow = true;
         Service.Configuration.Save();
     }
     
@@ -58,7 +58,7 @@ internal class AtmaWindow : Window
     /// </summary>
     public override void OnClose()
     {
-        Service.Configuration.IsAtmaWindowOpen = false;
+        Service.Configuration.AtmaConfiguration.DisplayAtmaWindow = false;
         Service.Configuration.Save();
     }
     
@@ -177,6 +177,14 @@ internal class AtmaWindow : Window
     /// <inheritdoc/>
     public override void Draw()
     {
+        // If disabled, do nothing
+        if (!Service.Configuration.AtmaConfiguration.Enabled)
+        {
+            ImGui.TextColored(new Vector4(1f, 0.5f, 0.5f, 1f), "Atma Manager is disabled.");
+            ImGui.TextColored(new Vector4(1f, 0.5f, 0.5f, 1f), $"Enable it in the settings ({ZodiacBuddyPlugin.Command}).");
+            return;
+        }
+        
         if (!DependenciesMet()) return;
         RenderRelicBookButton();
         
@@ -381,6 +389,10 @@ internal class AtmaWindow : Window
     {
         try
         {
+            // If disabled, do nothing
+            if (!Service.Configuration.AtmaConfiguration.Enabled)
+                return;
+            
             unsafe
             {
                 var addon = RelicNote.Instance();

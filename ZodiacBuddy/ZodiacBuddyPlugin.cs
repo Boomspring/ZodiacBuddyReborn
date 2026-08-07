@@ -15,8 +15,7 @@ namespace ZodiacBuddy;
 /// Main plugin implementation.
 /// </summary>
 public sealed class ZodiacBuddyPlugin : IDalamudPlugin {
-    private const string Command = "/pzodiac";
-    private const string TargetWindowCommand = "/ztarget";
+    internal const string Command = "/pzodiac";
 
     private readonly NovusManager novusManager;
     private readonly BraveManager braveManager;
@@ -31,7 +30,7 @@ public sealed class ZodiacBuddyPlugin : IDalamudPlugin {
     public ZodiacBuddyPlugin(IDalamudPluginInterface pluginInterface) {
         pluginInterface.Create<Service>();
 
-        ECommons.ECommonsMain.Init(pluginInterface, this, Module.DalamudReflector);
+        ECommonsMain.Init(pluginInterface, this, Module.DalamudReflector);
         Service.Plugin = this;
         Service.Configuration = pluginInterface.GetPluginConfig() as PluginConfiguration ?? new PluginConfiguration();
 
@@ -55,7 +54,6 @@ public sealed class ZodiacBuddyPlugin : IDalamudPlugin {
     /// <inheritdoc/>
     public void Dispose() {
         Service.CommandManager.RemoveHandler(Command);
-        Service.CommandManager.RemoveHandler(TargetWindowCommand);
         Service.Interface.UiBuilder.Draw -= this.windowSystem.Draw;
         Service.Interface.UiBuilder.OpenConfigUi -= this.OnOpenConfigUi;
 
@@ -70,7 +68,7 @@ public sealed class ZodiacBuddyPlugin : IDalamudPlugin {
     /// Print a message.
     /// </summary>
     /// <param name="message">Message to send.</param>
-    public void PrintMessage(SeString message) {
+    public static void PrintMessage(SeString message) {
         var sb = new SeStringBuilder()
             .AddUiForeground("[ZodiacBuddy] ", 45)
             .Append(message);

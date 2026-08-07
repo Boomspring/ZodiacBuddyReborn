@@ -138,7 +138,7 @@ internal class NovusManager : IDisposable {
             if (!message.ToString().Contains(lightLevel.Message))
                 continue;
 
-            Service.Plugin.PrintMessage($"Light Intensity has increased by {lightLevel.Intensity}.");
+            ZodiacBuddyPlugin.PrintMessage($"Light Intensity has increased by {lightLevel.Intensity}.");
 
             var territoryId = Service.ClientState.TerritoryType;
             if (!BonusLightDuty.TryGetValue(territoryId, out var territoryLight))

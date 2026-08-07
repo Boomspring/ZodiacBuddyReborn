@@ -6,6 +6,7 @@ using System.Numerics;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
+using Dalamud.Bindings.ImGui;
 using Dalamud.Game.Addon.Events;
 using Dalamud.Game.Addon.Lifecycle;
 using Dalamud.Game.Addon.Lifecycle.AddonArgTypes;
@@ -15,6 +16,7 @@ using Dalamud.Game.ClientState.Fates;
 using Dalamud.Game.Command;
 using Dalamud.Game.Inventory;
 using Dalamud.Game.Text;
+using Dalamud.Game.Text.SeStringHandling;
 using Dalamud.Game.Text.SeStringHandling.Payloads;
 using Dalamud.Interface.Windowing;
 using Dalamud.Plugin;
@@ -31,6 +33,7 @@ using FFXIVClientStructs.FFXIV.Component.GUI;
 using Lumina.Excel.Sheets;
 using ZodiacBuddy.SmartCaseUtil;
 using RelicNote = FFXIVClientStructs.FFXIV.Client.Game.UI.RelicNote;
+using Plugin = ZodiacBuddy.ZodiacBuddyPlugin;
 
 namespace ZodiacBuddy.Stages.Atma;
 
@@ -96,7 +99,7 @@ public partial class AtmaManager : IDisposable
         // Commands
         Service.CommandManager.AddHandler(AtmaStageViewerCommand, new CommandInfo(OpenAtmaWindow)
         {
-            HelpMessage = "Open the Atma Stage Viewer.",
+            HelpMessage = "Open the Atma Window.",
             ShowInHelp = true,
         });
 
@@ -160,6 +163,13 @@ public partial class AtmaManager : IDisposable
     /// <param name="args">Properties of the addon</param>
     private void ReceiveRelicNoteBookEvent(AddonEvent type, AddonArgs args)
     {
+        // If disabled, do nothing
+        if (!Service.Configuration.AtmaConfiguration.Enabled)
+        {
+            Plugin.PrintError($"Atma Manager is disabled. Enable it in the settings ({Plugin.Command}).");
+            return;
+        }
+        
         // First, cleanly check if the event is for us
         if (args is not AddonReceiveEventArgs
             { 
@@ -168,7 +178,7 @@ public partial class AtmaManager : IDisposable
 
         if (AutoDuty.Enabled && AutoDuty.IsNavigating())
         {
-            Service.ChatGui.PrintError($"[ZodiacBuddy] AutoDuty is currently in progress. Please wait until it's finished.");
+            Plugin.PrintError($"AutoDuty is currently in progress. Please wait until it's finished.");
             return;
         }
         
@@ -178,13 +188,13 @@ public partial class AtmaManager : IDisposable
         // Safeguarding
         if (!_usingCorrectRelic)
         {
-            Service.ChatGui.PrintError($"[ZodiacBuddy] Weapon used does not match book.");
+            Plugin.PrintError($"Weapon used does not match book.");
             return;
         }
 
         if (completion >= total)
         {
-            Service.ChatGui.PrintError($"[ZodiacBuddy] {SmartCaseHelper.SmartTitleCase(braveTarget.Name)} already completed.");
+            Plugin.PrintError($"{SmartCaseHelper.SmartTitleCase(braveTarget.Name)} already completed.");
             return; 
         }
 
@@ -193,6 +203,20 @@ public partial class AtmaManager : IDisposable
         this._atmaWindow.Completion = completion;
         this._atmaWindow.Total = total;
         _currentBook = braveBook;
+        
+        if (Service.Configuration.AtmaConfiguration.BraveEchoTarget)
+        {
+            var sb = new SeStringBuilder().AddText("Selected ").AddUiForeground(braveTarget.Name, 62);
+            if (!braveTarget.Issuer.IsNullOrEmpty()) sb.AddText($" from {braveTarget.Issuer}");
+            sb.AddText($" ({braveTarget.Position.PlaceName}).");
+            Plugin.PrintMessage(sb.BuiltString);
+        }
+        
+        if (Service.Configuration.AtmaConfiguration.BraveCopyTarget)
+        {
+            Plugin.PrintMessage($"Copied {braveTarget.Name} to clipboard.");
+            ImGui.SetClipboardText(SmartCaseHelper.SmartTitleCase(braveTarget.Name));
+        }
 
         if (braveTarget.ContentsFinderConditionId > 0)
         {
@@ -211,6 +235,10 @@ public partial class AtmaManager : IDisposable
     /// <param name="message">Properties of the chat message</param>
     private void OnRelicEnemyKill(IHandleableChatMessage message)
     {
+        // If disabled, do nothing
+        if (!Service.Configuration.AtmaConfiguration.Enabled)
+            return;
+        
         // Validation of the message
         if (message.LogKind != XivChatType.SystemMessage)
             return;
@@ -246,6 +274,10 @@ public partial class AtmaManager : IDisposable
     /// <param name="message">Properties of the chat message</param>
     private void OnRelicFateOrLeveKill(IHandleableChatMessage message)
     {
+        // If disabled, do nothing
+        if (!Service.Configuration.AtmaConfiguration.Enabled)
+            return;
+        
         // Validation of the message
         if (message.LogKind != XivChatType.SystemMessage)
             return;
@@ -273,6 +305,10 @@ public partial class AtmaManager : IDisposable
     /// <param name="message">Properties of the chat message</param>
     private void OnBookChanged(IHandleableChatMessage message)
     {
+        // If disabled, do nothing
+        if (!Service.Configuration.AtmaConfiguration.Enabled)
+            return;
+        
         // Validation of the message?
         if (message.LogKind != XivChatType.SystemMessage)
             return;
@@ -317,7 +353,7 @@ public partial class AtmaManager : IDisposable
 
         if (started)
         {
-            Service.ChatGui.Print($"[ZodiacBuddy] AutoDuty: starting unsynced for {braveTarget.Position.PlaceName}.");
+            Plugin.PrintMessage($"AutoDuty: starting unsynced for {braveTarget.Position.PlaceName}.");
             return;
         }
 
@@ -327,7 +363,7 @@ public partial class AtmaManager : IDisposable
             AgentContentsFinder.Instance()->OpenRegularDuty(braveTarget.ContentsFinderConditionId);
         }
 
-        Service.ChatGui.PrintError($"[ZodiacBuddy] AutoDuty unavailable. Opened Duty Finder for {braveTarget.Position.PlaceName}.");
+        Plugin.PrintError($"AutoDuty unavailable. Opened Duty Finder for {braveTarget.Position.PlaceName}.");
     }
 
     /// <summary>
@@ -373,12 +409,20 @@ public partial class AtmaManager : IDisposable
             // Teleport conditions to wait until you're in the right territory
             if (Player.Territory.RowId != braveTarget.Position.TerritoryType.RowId)
             {
-                TeleportToNearestAetheryte(braveTarget.Position);
-                if (!await WaitForConditions(() => Svc.Condition[ConditionFlag.BetweenAreas], true, token))
-                    return false;
-                if (!await WaitForConditions(() => Svc.Condition[ConditionFlag.BetweenAreas], false, token))
-                    return false;
-                if (!await WaitForConditions(GenericHelpers.IsScreenReady, true, token)) return false;
+                if (Service.Configuration.AtmaConfiguration.DisableTeleport)
+                {
+                    Plugin.PrintMessage($"Teleport disabled, you will need to navigate to " +
+                                                   $"{braveTarget.Position.PlaceName}: {braveTarget.Position.CoordinateString}.");
+                }
+                else
+                {
+                    TeleportToNearestAetheryte(braveTarget.Position);
+                    if (!await WaitForConditions(() => Svc.Condition[ConditionFlag.BetweenAreas], true, token))
+                        return false;
+                    if (!await WaitForConditions(() => Svc.Condition[ConditionFlag.BetweenAreas], false, token))
+                        return false;
+                    if (!await WaitForConditions(GenericHelpers.IsScreenReady, true, token)) return false;
+                }
             }
 
             // Check if fate is running
@@ -464,6 +508,10 @@ public partial class AtmaManager : IDisposable
     /// </summary>
     private void InitializeRelicEventItem()
     {
+        // If disabled, do nothing
+        if (!Service.Configuration.AtmaConfiguration.Enabled)
+            return;
+        
         var excelItems = Service.DataManager.GetExcelSheet<EventItem>();
     
         // Searches every key item in the inventory for the Relic Book
@@ -783,10 +831,11 @@ public partial class AtmaManager : IDisposable
         const int pathfindingDelayMs = 67;
         const int timeoutMs = 6969;
         const int retryAttempts = 5;
-        var sw = Stopwatch.StartNew();
         
         for (var i = 0 ; i < retryAttempts ; i++)
         {
+            var sw = Stopwatch.StartNew();
+            
             // Repeat dismount
             while (Svc.Condition[ConditionFlag.Mounted] && sw.ElapsedMilliseconds < timeoutMs)
             {
@@ -802,7 +851,7 @@ public partial class AtmaManager : IDisposable
             if (Svc.Condition[ConditionFlag.InFlight])
             {
                 // Try to find a safe position to move to after failing to dismount.
-                Service.PluginLog.Warning($"Trying to recover after failing to dismount.");
+                Service.PluginLog.Warning("Trying to recover after failing to dismount.");
 
                 var player = await Svc.Framework.RunOnTick(() => Svc.ClientState.LocalPlayer, cancellationToken: token);
 
@@ -814,8 +863,9 @@ public partial class AtmaManager : IDisposable
                     }
                     catch (Exception)
                     {
-                        Service.ChatGui.PrintError($"[ZodiacBuddy] Could not land. Will retry {retryAttempts - i - 1 } times.");
-                        Service.PluginLog.Error($"Could not land. Will retry {retryAttempts - i - 1 } times.");
+                        var error = $"Could not land. Will retry {retryAttempts - i - 1} times.";
+                        Plugin.PrintError(error);
+                        Service.PluginLog.Error(error);
                         return Vector3.Zero;
                     }
                 }, cancellationToken: token);
@@ -860,6 +910,10 @@ public partial class AtmaManager : IDisposable
 
     private unsafe void DoesEquippedContainExpectedRelic(IFramework framework)
     {
+        // If disabled, do nothing
+        if (!Service.Configuration.AtmaConfiguration.Enabled)
+            return;
+        
         try
         {
             // Safeguards
