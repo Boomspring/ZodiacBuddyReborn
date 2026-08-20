@@ -289,12 +289,12 @@ internal struct BraveBook {
             516 => new MapLinkPayload(156, 25, 15.7f, 14.3f), // Black and Nburu            // Mor Dhona
             517 => new MapLinkPayload(156, 25, 13.0f, 12.0f), // Good to Be Bud             // Mor Dhona
             521 => new MapLinkPayload(156, 25, 31.1f,  4.7f), // Another Notch on the Torch // Mor Dhona
-            540 => new MapLinkPayload(145, 22, 26.0f, 24.0f), // Quartz Coupling            // Eastern Thanalan
+            540 => new MapLinkPayload(145, 22, 26.5f, 24.9f), // Quartz Coupling            // Eastern Thanalan
             543 => new MapLinkPayload(145, 22, 30.2f, 25.3f), // The Big Bagoly Theory      // Eastern Thanalan
             552 => new MapLinkPayload(146, 23, 18.0f, 20.0f), // Taken                      // Southern Thanalan
             569 => new MapLinkPayload(138, 18, 21.0f, 19.0f), // Breaching North Tidegate   // Western La Noscea
             571 => new MapLinkPayload(138, 18, 19.1f, 22.2f), // Breaching South Tidegate   // Western La Noscea
-            577 => new MapLinkPayload(138, 18, 14.0f, 34.0f), // The King's Justice         // Western La Noscea
+            577 => new MapLinkPayload(138, 18, 14.4f, 34.7f), // The King's Justice         // Western La Noscea
             587 => new MapLinkPayload(180, 30, 25.0f, 16.0f), // Schism                     // Outer La Noscea
             589 => new MapLinkPayload(180, 30, 25.3f, 17.9f), // Make It Rain               // Outer La Noscea
             604 => new MapLinkPayload(148,  4, 11.0f, 18.0f), // In Spite of It All         // Central Shroud
