@@ -263,8 +263,10 @@ public partial class AtmaManager : IDisposable
         _atmaWindow.Completion = byte.Parse(m.Groups[2].Value[..1]);
         _atmaWindow.Total = byte.Parse(m.Groups[2].Value.Substring(2, 1));
 
-        if (_atmaWindow.Completion != _atmaWindow.Total) return;
-        CancelPathfinding();
+        if (enemyCheck.HasValue || _atmaWindow.Completion == _atmaWindow.Total)
+        {
+            CancelPathfinding();
+        }
     }
     
     /// <summary>
@@ -764,23 +766,24 @@ public partial class AtmaManager : IDisposable
             if (dist <= distThreshold)
                 return true;
             
-            // Request movement once when navmesh is idle
+            // Request movement when navmesh is idle
             if (!VNavmesh.Path.IsRunning() && !VNavmesh.SimpleMove.PathfindInProgress())
             {
                 if (requestedMove)
                 {
-                    if (Cts != null)
-                    {
-                        // VNavmesh aborted pathfinding because user moved.
-                        CancelPathfinding();
-                    }
+                    Service.PluginLog.Warning(
+                        $"VNavmesh stopped or failed to start movement. Target: {target}, Distance: {dist:0.00}, Fly: {fly}");
+
+                    return false;
                 }
-                else
-                {
-                    await Svc.Framework.RunOnTick(() =>
-                        VNavmesh.SimpleMove.PathfindAndMoveTo(target, fly), cancellationToken: token);
-                    requestedMove = true;
-                }
+
+                Service.PluginLog.Debug(
+                    $"Requesting VNavmesh movement. Target: {target}, Distance: {dist:0.00}, Fly: {fly}");
+
+                await Svc.Framework.RunOnTick(() =>
+                    VNavmesh.SimpleMove.PathfindAndMoveTo(target, fly), cancellationToken: token);
+
+                requestedMove = true;
             }
             else if (fly && !Svc.Condition[ConditionFlag.Mounted] && Cts != null)
             {

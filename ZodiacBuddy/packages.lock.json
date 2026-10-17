@@ -10,15 +10,15 @@
       },
       "DotNet.ReproducibleBuilds": {
         "type": "Direct",
-        "requested": "[2.0.2, )",
-        "resolved": "2.0.2",
-        "contentHash": "VaHoEN6YHp0jXucxm67vfuRy8zo9ufiKSuaZ4ZudRi8xmWcEFMKxfCsg2nvYNvdISFTURDu+IHqADGh53+Bamw=="
+        "requested": "[2.0.5, )",
+        "resolved": "2.0.5",
+        "contentHash": "8LrlvI1KpjjJ4VGSqZ16yoOCKlQnYS+Y8rYNifNrscmVh5anJcF9E4e0NiDP30BHBMUbkoJ5KdcxoRWM7Pz9Aw=="
       },
       "ECommons": {
         "type": "Direct",
-        "requested": "[3.2.0.9, )",
-        "resolved": "3.2.0.9",
-        "contentHash": "JWD/HU+CUBFRCRTJzdyL+Ld6BedndYXk10bZHNbaGleO6WZQWxUUwAAKtJNZgvyrzQ53fqEvnuHml3mNYORl5w=="
+        "requested": "[3.2.1.26, )",
+        "resolved": "3.2.1.26",
+        "contentHash": "llUY80afPoU11VXKwAKhiAByFHSiiF5OD2BdIeYsHuCz+FRJoku39zga0br7THGY8PzhfH3hVOx8zdFW8d8iEA=="
       },
       "LitJWT": {
         "type": "Direct",

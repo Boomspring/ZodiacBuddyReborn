@@ -434,9 +434,23 @@ internal class AtmaWindow : Window
                 {
                     _pathingTimer.Reset();
                     Service.PluginLog.Debug("No targets found.");
+
+                    var flagPosition = await Svc.Framework.RunOnTick(() => VNavmesh.Query.Mesh.FlagToPoint());
+
                     Service.AtmaManager.Cts = new CancellationTokenSource();
-                    await System.Threading.Tasks.Task.Run(() => Service.AtmaManager.MoveToAsync(VNavmesh.Query.Mesh.FlagToPoint(), Service.AtmaManager.Cts.Token, false));
-                    Service.AtmaManager.Cts = null;
+                    try
+                    {
+                        await System.Threading.Tasks.Task.Run(() =>
+                            Service.AtmaManager.MoveToAsync(
+                                flagPosition,
+                                Service.AtmaManager.Cts.Token,
+                                false));
+                    }
+                    finally
+                    {
+                        Service.AtmaManager.Cts?.Dispose();
+                        Service.AtmaManager.Cts = null;
+                    }
                 }
                     return;
                 // Otherwise, attempt to path to the nearest mob every 2 seconds
@@ -444,16 +458,31 @@ internal class AtmaWindow : Window
                 {
                     _pathingTimer.Reset();
                     Service.PluginLog.Debug($"Found nearest target... {nearest}");
+
+                    var nearestPosition = await Svc.Framework.RunOnTick(() => nearest.Position);
+
                     Service.AtmaManager.Cts = new CancellationTokenSource();
-                    await System.Threading.Tasks.Task.Run(() => Service.AtmaManager.MoveToAsync(nearest.Position, Service.AtmaManager.Cts.Token, false));
-                    Service.AtmaManager.Cts = null;
+                    try
+                    {
+                        await System.Threading.Tasks.Task.Run(() =>
+                            Service.AtmaManager.MoveToAsync(
+                                nearestPosition,
+                                Service.AtmaManager.Cts.Token,
+                                false));
+                    }
+                    finally
+                    {
+                        Service.AtmaManager.Cts?.Dispose();
+                        Service.AtmaManager.Cts = null;
+                    }
                 }
                     break;
             }
         }
-        catch (Exception)
+        catch (Exception ex)
         {
             // ignored
+            Service.PluginLog.Error($"FindNearest failed: {ex}");
         }
     }
 }
