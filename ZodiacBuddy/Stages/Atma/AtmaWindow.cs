@@ -479,9 +479,12 @@ internal class AtmaWindow : Window
                     break;
             }
         }
+        catch (OperationCanceledException)
+        {
+            // Expected when pathing is cancelled by combat, target changes, or plugin state changes.
+        }
         catch (Exception ex)
         {
-            // ignored
             Service.PluginLog.Error($"FindNearest failed: {ex}");
         }
     }
