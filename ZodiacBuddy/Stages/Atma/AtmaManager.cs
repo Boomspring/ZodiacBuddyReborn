@@ -225,7 +225,7 @@ public partial class AtmaManager : IDisposable
         }
 
         // Async move to location
-        MarkFlagAndFly(braveTarget);
+        _ = MarkFlagAndFly(braveTarget);
     }
     
     /// <summary>
@@ -372,17 +372,42 @@ public partial class AtmaManager : IDisposable
     /// Attempts to mark the position of the target, teleport (if required) and navigate to it.
     /// </summary>
     /// <param name="braveTarget">The objective (i.e. enemy, FATE, Leve)</param>
-    internal void MarkFlagAndFly(BraveTarget braveTarget)
+    internal async Task MarkFlagAndFly(BraveTarget braveTarget)
     {
         FlagTargetOnMap(braveTarget.Position);
 
-        CancelPathfinding();
+        await CancelPathfinding();
         Cts = new CancellationTokenSource();
 
-        Task.Run(() => FlyRoutineAsync(braveTarget, Cts.Token)).ContinueWith(_ =>
+        try
         {
-            CancelPathfinding();
-        });
+            await FlyRoutineAsync(braveTarget, Cts.Token);
+        }
+        finally
+        {
+            await CancelPathfinding();
+        }
+    }
+    
+    /// <summary>
+    /// Attempts to move to a given position.
+    /// </summary>
+    /// <param name="position">The position to move to</param>
+    /// <param name="fly">Whether to fly to the position</param>
+    internal async Task MoveToPositionAsync(Vector3 position, bool fly)
+    {
+        await CancelPathfinding();
+        Cts = new CancellationTokenSource();
+
+        try
+        {
+            await MoveToAsync(position, Cts.Token, fly);
+        }
+        finally
+        {
+            Cts?.Dispose();
+            Cts = null;
+        }
     }
     
     /// <summary>
@@ -457,7 +482,8 @@ public partial class AtmaManager : IDisposable
                 }, cancellationToken: token);
             }
 
-            VNavmesh.Query.Mesh.PointOnFloor(target, true, 1f);
+            target = await Svc.Framework.RunOnTick(() => 
+                VNavmesh.Query.Mesh.PointOnFloor(target, true, 1f), cancellationToken: token);
 
             Service.PluginLog.Info("Point identified. Starting movement.");
 
@@ -788,7 +814,7 @@ public partial class AtmaManager : IDisposable
             else if (fly && !Svc.Condition[ConditionFlag.Mounted] && Cts != null)
             {
                 // User manually dismounted
-                CancelPathfinding();
+                await CancelPathfinding();
             }
 
             await Task.Delay(pollDelay, token);
@@ -895,7 +921,7 @@ public partial class AtmaManager : IDisposable
     /// <summary>
     /// Stops the <see cref="VNavmesh"/> and cancels the token.
     /// </summary>
-    private async void CancelPathfinding()
+    private async Task CancelPathfinding()
     {
         try
         {

@@ -266,7 +266,7 @@ internal class AtmaWindow : Window
                     ImGui.TableNextColumn();
                     if (ImGui.Button("Travel", new Vector2(75f, 20f)) && !Svc.Condition[ConditionFlag.InCombat])
                     {
-                        Service.AtmaManager.MarkFlagAndFly(Target.Value);
+                        _ = Service.AtmaManager.MarkFlagAndFly(Target.Value);
                     }
                     ImGui.EndTable();
                     ImGui.TableNextRow();
@@ -414,6 +414,17 @@ internal class AtmaWindow : Window
             if (autoDutyChecks || conditionChecks || Service.AtmaManager.Cts != null) return;
             
             var position = await Svc.Framework.RunOnTick(() => Player.Position);
+            var flagPosition = Vector3.Zero;
+
+            try
+            {
+                flagPosition = await Svc.Framework.RunOnTick(() => VNavmesh.Query.Mesh.FlagToPoint());
+            }
+            catch (Exception)
+            {
+                // No valid flag set yet.
+            }
+
             var nearest = Service.ObjectTable.CharacterManagerObjects
                 .Where(playerObject => string.Equals(playerObject.Name.TextValue, Target!.Value.Name, StringComparison.CurrentCultureIgnoreCase))
                 .Where(playerObject => playerObject.ObjectKind == ObjectKind.BattleNpc)
@@ -430,27 +441,13 @@ internal class AtmaWindow : Window
                                && Target.Value is { ContentsFinderConditionId: 0, FateId: 0 }
                                && Target.Value.Issuer.IsNullOrEmpty()
                                && _pathingTimer.Elapsed > TimeSpan.FromSeconds(5)
-                               && Vector3.Distance(position, VNavmesh.Query.Mesh.FlagToPoint()) < 150:
+                               && flagPosition != Vector3.Zero
+                               && Vector3.Distance(position, flagPosition) < 150:
                 {
                     _pathingTimer.Reset();
                     Service.PluginLog.Debug("No targets found.");
-
-                    var flagPosition = await Svc.Framework.RunOnTick(() => VNavmesh.Query.Mesh.FlagToPoint());
-
-                    Service.AtmaManager.Cts = new CancellationTokenSource();
-                    try
-                    {
-                        await System.Threading.Tasks.Task.Run(() =>
-                            Service.AtmaManager.MoveToAsync(
-                                flagPosition,
-                                Service.AtmaManager.Cts.Token,
-                                false));
-                    }
-                    finally
-                    {
-                        Service.AtmaManager.Cts?.Dispose();
-                        Service.AtmaManager.Cts = null;
-                    }
+                    
+                    await Service.AtmaManager.MoveToPositionAsync(flagPosition, false);
                 }
                     return;
                 // Otherwise, attempt to path to the nearest mob every 2 seconds
@@ -461,20 +458,7 @@ internal class AtmaWindow : Window
 
                     var nearestPosition = await Svc.Framework.RunOnTick(() => nearest.Position);
 
-                    Service.AtmaManager.Cts = new CancellationTokenSource();
-                    try
-                    {
-                        await System.Threading.Tasks.Task.Run(() =>
-                            Service.AtmaManager.MoveToAsync(
-                                nearestPosition,
-                                Service.AtmaManager.Cts.Token,
-                                false));
-                    }
-                    finally
-                    {
-                        Service.AtmaManager.Cts?.Dispose();
-                        Service.AtmaManager.Cts = null;
-                    }
+                    await Service.AtmaManager.MoveToPositionAsync(nearestPosition, false);
                 }
                     break;
             }
