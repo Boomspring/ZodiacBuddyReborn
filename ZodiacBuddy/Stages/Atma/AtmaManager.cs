@@ -85,7 +85,7 @@ public partial class AtmaManager : IDisposable
     internal CancellationTokenSource? Cts;
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="AtmaManager"/> class.
+    /// Initialises a new instance of the <see cref="AtmaManager"/> class.
     /// </summary>
     /// <param name="pluginInterface">Dalamud plugin interface.</param>
     public AtmaManager(IDalamudPluginInterface pluginInterface)
@@ -251,7 +251,7 @@ public partial class AtmaManager : IDisposable
         
         Service.PluginLog.Debug($"{SmartCaseHelper.SmartTitleCase(m.Groups[1].Value)} killed.");
 
-        // Was it for enemies or dungeons?
+        // Determines if the kill was for enemies or dungeons
         var enemyCheck = _currentBook.Value.Enemies
             .FirstOrNull(target => target.Name == m.Groups[1].Value);
         var dungeonCheck = _currentBook.Value.Dungeons
@@ -265,7 +265,7 @@ public partial class AtmaManager : IDisposable
 
         if (enemyCheck.HasValue || _atmaWindow.Completion == _atmaWindow.Total)
         {
-            CancelPathfinding();
+            _ = CancelPathfinding();
         }
     }
     
@@ -405,8 +405,7 @@ public partial class AtmaManager : IDisposable
         }
         finally
         {
-            Cts?.Dispose();
-            Cts = null;
+            await CancelPathfinding();
         }
     }
     
@@ -416,19 +415,19 @@ public partial class AtmaManager : IDisposable
     /// </summary>
     /// <param name="braveTarget">The objective (i.e. enemy, FATE, Leve)</param>
     /// <param name="token">Used to cancel the task (e.g. if the user moves)</param>
-    private async Task<bool> FlyRoutineAsync(BraveTarget braveTarget, CancellationToken token)
+    private async Task FlyRoutineAsync(BraveTarget braveTarget, CancellationToken token)
     {
         // Safeguards
         if (!VNavmesh.Enabled)
         {
             Service.PluginLog.Error("Navmesh not enabled.");
-            return false;
+            return;
         }
 
         if (Svc.Condition[ConditionFlag.InCombat])
         {
             Service.PluginLog.Info("In combat.");
-            return false;
+            return;
         }
         
         try
@@ -445,16 +444,17 @@ public partial class AtmaManager : IDisposable
                 {
                     TeleportToNearestAetheryte(braveTarget.Position);
                     if (!await WaitForConditions(() => Svc.Condition[ConditionFlag.BetweenAreas], true, token))
-                        return false;
+                        return;
                     if (!await WaitForConditions(() => Svc.Condition[ConditionFlag.BetweenAreas], false, token))
-                        return false;
-                    if (!await WaitForConditions(GenericHelpers.IsScreenReady, true, token)) return false;
+                        return;
+                    if (!await WaitForConditions(GenericHelpers.IsScreenReady, true, token)) 
+                        return;
                 }
             }
 
             // Check if fate is running
             if (braveTarget.FateId > 0 && !IsFateRunning(braveTarget))
-                return false;
+                return;
 
             // Mount if not already occupy
             if (!Svc.Condition[ConditionFlag.Mounted])
@@ -510,8 +510,6 @@ public partial class AtmaManager : IDisposable
                 {
                     Service.PluginLog.Error("Failed to dismount.");
                 }
-
-                return dismountResult;
             }
         }
         catch (OperationCanceledException)
@@ -526,8 +524,6 @@ public partial class AtmaManager : IDisposable
         {
             Service.PluginLog.Error($"Fly: {ex}");
         }
-
-        return false;
     }
 
     /// <summary>
@@ -678,8 +674,8 @@ public partial class AtmaManager : IDisposable
     /// <param name="payload">Coordinates of the target (flag or aetheryte)</param>
     private static (float AetherstreamX, float AetherstreamY) GetAetherstreamCoords(MapLinkPayload payload)
     {
-        return ((payload.RawX / 1000f + payload.Map.Value.OffsetX) * payload.Map.Value.SizeFactor / 100f, 
-            (payload.RawY / 1000f + payload.Map.Value.OffsetY) * payload.Map.Value.SizeFactor / 100f);
+        return (((payload.RawX / 1000f) + payload.Map.Value.OffsetX) * payload.Map.Value.SizeFactor / 100f, 
+            ((payload.RawY / 1000f) + payload.Map.Value.OffsetY) * payload.Map.Value.SizeFactor / 100f);
     }
     
     /// <summary>
@@ -734,7 +730,7 @@ public partial class AtmaManager : IDisposable
     /// <summary>
     /// Asynchronously wait for a boolean condition to resolve and compare against the expected state. Can be cancelled.
     /// </summary>
-    /// <param name="condition">Boolean function that is ran every 200ms and evaluated again expected state.</param>
+    /// <param name="condition">Boolean function that is run every 200ms and evaluated again expected state.</param>
     /// <param name="state">Expected result of condition.</param>
     /// <param name="token">Used to cancel (e.g. if the user moved).</param>
     private static async Task<bool> WaitForConditions(Func<bool> condition, bool state, CancellationToken token)
@@ -774,7 +770,7 @@ public partial class AtmaManager : IDisposable
     /// <param name="target">Position being moved to.</param>
     /// <param name="token">Used to cancel (e.g. if the user moved during the automove).</param>
     /// <param name="fly">Is the user going via air or via walking?</param>
-    internal async Task<bool> MoveToAsync(Vector3 target, CancellationToken token, bool fly = true)
+    private async Task<bool> MoveToAsync(Vector3 target, CancellationToken token, bool fly = true)
     {
         const float distThreshold = 3f;
         var pollDelay = TimeSpan.FromMilliseconds(100);

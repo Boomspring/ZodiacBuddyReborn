@@ -7,7 +7,6 @@ using Dalamud.Interface.Windowing;
 using Dalamud.Plugin.Services;
 using ECommons.DalamudServices;
 using System.Numerics;
-using System.Threading;
 using Dalamud.Game.ClientState.Conditions;
 using Dalamud.Game.ClientState.Objects.Enums;
 using Dalamud.Game.Inventory;
@@ -32,7 +31,7 @@ internal class AtmaWindow : Window
     private Stopwatch _pathingTimer = new();
     
     /// <summary>
-    /// Initializes a new instance of the <see cref="AtmaWindow"/> class.
+    /// Initialises a new instance of the <see cref="AtmaWindow"/> class.
     /// </summary>
     public AtmaWindow() : base("Atma Window", ImGuiWindowFlags.AlwaysAutoResize)
     { 
@@ -82,7 +81,7 @@ internal class AtmaWindow : Window
 
         var totalWidth =
             boxSize + style.ItemInnerSpacing.X + labelSize.X +
-            (useQuestionMark ? (style.ItemInnerSpacing.X + boxSize * 0.55f) : 0f);
+            (useQuestionMark ? (style.ItemInnerSpacing.X + (boxSize * 0.55f)) : 0f);
 
         ImGui.Dummy(new Vector2(totalWidth, boxSize));
 
@@ -105,9 +104,9 @@ internal class AtmaWindow : Window
 
             const float thickness = 2.5f;
 
-            var p1 = new Vector2(cursor.X + boxSize * 0.25f, cursor.Y + boxSize * 0.55f);
-            var p2 = new Vector2(cursor.X + boxSize * 0.42f, cursor.Y + boxSize * 0.72f);
-            var p3 = new Vector2(cursor.X + boxSize * 0.78f, cursor.Y + boxSize * 0.30f);
+            var p1 = new Vector2(cursor.X + (boxSize * 0.25f), cursor.Y + (boxSize * 0.55f));
+            var p2 = new Vector2(cursor.X + (boxSize * 0.42f), cursor.Y + (boxSize * 0.72f));
+            var p3 = new Vector2(cursor.X + (boxSize * 0.78f), cursor.Y + (boxSize * 0.30f));
 
             dl.AddLine(p1, p2, colU32, thickness);
             dl.AddLine(p2, p3, colU32, thickness);
@@ -118,7 +117,7 @@ internal class AtmaWindow : Window
             var qmU32 = ImGui.GetColorU32(qmCol);
 
             var r = boxSize * 0.33f;
-            var center = new Vector2(cursor.X + boxSize * 0.5f, cursor.Y + boxSize * 0.5f);
+            var center = new Vector2(cursor.X + (boxSize * 0.5f), cursor.Y + (boxSize * 0.5f));
 
             dl.AddCircleFilled(center, r, qmU32);
 
@@ -129,8 +128,8 @@ internal class AtmaWindow : Window
             var qmTextSize = ImGui.CalcTextSize(qm);
 
             var qmTextPos = new Vector2(
-                center.X - qmTextSize.X * 0.5f,
-                center.Y - qmTextSize.Y * 0.5f
+                center.X - (qmTextSize.X * 0.5f),
+                center.Y - (qmTextSize.Y * 0.5f)
             );
 
             dl.AddText(qmTextPos, qmTextU32, qm);
@@ -147,10 +146,10 @@ internal class AtmaWindow : Window
 
             const float thickness = 2.5f;
 
-            var p1 = new Vector2(cursor.X + boxSize * 0.25f, cursor.Y + boxSize * 0.25f);
-            var p2 = new Vector2(cursor.X + boxSize * 0.75f, cursor.Y + boxSize * 0.75f);
-            var p3 = new Vector2(cursor.X + boxSize * 0.75f, cursor.Y + boxSize * 0.25f);
-            var p4 = new Vector2(cursor.X + boxSize * 0.25f, cursor.Y + boxSize * 0.75f);
+            var p1 = new Vector2(cursor.X + (boxSize * 0.25f), cursor.Y + (boxSize * 0.25f));
+            var p2 = new Vector2(cursor.X + (boxSize * 0.75f), cursor.Y + (boxSize * 0.75f));
+            var p3 = new Vector2(cursor.X + (boxSize * 0.75f), cursor.Y + (boxSize * 0.25f));
+            var p4 = new Vector2(cursor.X + (boxSize * 0.25f), cursor.Y + (boxSize * 0.75f));
 
             dl.AddLine(p1, p2, colU32, thickness);
             dl.AddLine(p3, p4, colU32, thickness);
@@ -158,7 +157,7 @@ internal class AtmaWindow : Window
 
         var textPos = new Vector2(
             cursor.X + boxSize + style.ItemInnerSpacing.X,
-            cursor.Y + (boxSize - labelSize.Y) * 0.5f
+            cursor.Y + ((boxSize - labelSize.Y) * 0.5f)
         );
 
         unsafe
